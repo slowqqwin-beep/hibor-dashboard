@@ -216,24 +216,25 @@ def main():
         errors.append("ONRRP")
 
     # ── ② 储备金 ──────────────────────────────────────────────────────
+    # WRESBAL 单位：百万美元 → 除以 1000 = 十亿美元
     print("\n② Bank Reserves (WRESBAL)")
     try:
-        hist_prev = load_history()
         d, v = fred_latest("WRESBAL")
-        record["reserves"] = v
-        print(f"   {v:.0f} B  ({d})  ✓")
+        record["reserves"] = round(v / 1000, 2)   # M → B
+        print(f"   {record['reserves']:.1f} B  ({d})  ✓")
     except Exception as e:
         print(f"   ERROR: {e}")
         errors.append("WRESBAL")
 
     # ── ③ TGA ─────────────────────────────────────────────────────────
+    # WTREGEN 单位：百万美元 → 除以 1000 = 十亿美元
     print("\n③ TGA (WTREGEN)")
     try:
         obs = fred_fetch("WTREGEN", limit=3)
         if len(obs) >= 1:
-            tga_now = obs[0]["value"]
-            tga_prev = obs[1]["value"] if len(obs) >= 2 else None
-            tga_wow = round(tga_now - tga_prev, 2) if tga_prev is not None else 0.0
+            tga_now  = round(obs[0]["value"] / 1000, 2)   # M → B
+            tga_prev = round(obs[1]["value"] / 1000, 2) if len(obs) >= 2 else None
+            tga_wow  = round(tga_now - tga_prev, 2) if tga_prev is not None else 0.0
             record["tga"]     = tga_now
             record["tga_wow"] = tga_wow
             print(f"   TGA={tga_now:.1f}B  WoW={tga_wow:+.1f}B  ({obs[0]['date']})  ✓")
