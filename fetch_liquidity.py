@@ -274,47 +274,54 @@ def fetch_jpy_basis(sofr_val: float | None = None) -> float | None:
         today = date.today()
         # 季度月份: 3=H, 6=M, 9=U, 12=Z
         quarter_months = [(3,'H'),(6,'M'),(9,'U'),(12,'Z')]
-        fwd_usdjpy = None
+        # ── CME 6J 期货近月合约 ──
+        # 6J 报价单位：USD per JPY（如 0.006700 表示 1JPY=0.006700USD）
+        # USDJPY = 1 / 报价  (如 1/0.006700 ≈ 149.25)
+        fwd_price_usd_per_jpy = None
+        fwd_ticker_used = None
         for month_num, letter in quarter_months:
             yr = today.year if month_num > today.month else today.year + 1
             ticker_sym = f"6J{letter}{str(yr)[-2:]}.CME"
             try:
                 df = yf.Ticker(ticker_sym).history(period="5d")
                 if not df.empty:
-                    fwd_raw = float(df["Close"].iloc[-1])
-                    # 6J 期货报价：JPY per USD 的倒数 × 10000
-                    # 实际单位：1 contract = 12,500,000 JPY，报价 = USD per JPY × 10^4
-                    fwd_usdjpy = 1.0 / (fwd_raw * 1e-4) if fwd_raw > 0 else None
-                    print(f"   6J ticker={ticker_sym}  raw={fwd_raw:.4f}  fwd_USDJPY={fwd_usdjpy:.2f}")
+                    fwd_price_usd_per_jpy = float(df["Close"].iloc[-1])
+                    fwd_ticker_used = ticker_sym
                     break
             except Exception:
                 continue
 
-        if fwd_usdjpy is None:
+        if fwd_price_usd_per_jpy is None or fwd_price_usd_per_jpy <= 0:
             raise ValueError("CME 6J 期货数据不可用")
 
-        # 覆盖利率平价：(Fwd/Spot - 1) × (360/90) × 100  = forward premium (%, ann.)
-        days = 91   # 近似 3M
-        fwd_prem_pct = ((spot_usdjpy / fwd_usdjpy) - 1) * (360 / days) * 100
+        # spot_usdjpy from JPY=X is already in JPY-per-USD form
+        # Convert spot to USD-per-JPY for consistent comparison
+        spot_usd_per_jpy = 1.0 / spot_usdjpy   # e.g. 1/149.25 ≈ 0.006700
 
-        # 近似日本 3M 无风险利率：从 FRED 取 Japan 3M 国债 IR3TIB01JPM156N（月频）
+        # Forward premium (annualized %) via CIP:
+        # fwd_prem = (F/S - 1) × (360/91) × 100
+        days = 91
+        fwd_prem_pct = (fwd_price_usd_per_jpy / spot_usd_per_jpy - 1) * (360 / days) * 100
+
+        # Japan 3M rate from FRED (monthly series, % p.a.)
         jpy_rate = None
         try:
             _, jpy_rate = fred_latest("IR3TIB01JPM156N")
         except Exception:
             pass
-
         if jpy_rate is None:
             raise ValueError("FRED JPY 3M 利率不可用")
 
-        sofr = sofr_val if sofr_val is not None else 4.30  # fallback
-        # 近似基差 = JPY_rate - sofr + forward_premium
-        # 在 CIP 无套利下 basis=0；实际 basis = 实际forward_prem - CIP_implied_prem
-        basis_pct = jpy_rate - sofr + fwd_prem_pct
+        sofr = sofr_val if sofr_val is not None else 4.30
+        # CIP basis = (JPY_rate - forward_prem_jpy) - SOFR
+        # = JPY_rate - (−fwd_prem_pct in JPY terms) - SOFR
+        # Simplified: basis ≈ JPY_rate - SOFR - fwd_prem_pct
+        basis_pct = jpy_rate - sofr - fwd_prem_pct
         basis_bp  = round(basis_pct * 100, 1)
-        print(f"   spot={spot_usdjpy:.2f}  fwd_prem={fwd_prem_pct:+.3f}%"
-              f"  JPY_rate={jpy_rate:.4f}%  SOFR={sofr:.4f}%"
-              f"  basis≈{basis_bp:+.1f}bp  ✓")
+        fwd_usdjpy_implied = 1.0 / fwd_price_usd_per_jpy
+        print(f"   spot={spot_usdjpy:.2f}  fwd={fwd_usdjpy_implied:.2f}({fwd_ticker_used})"
+              f"  fwd_prem={fwd_prem_pct:+.4f}%  JPY_rate={jpy_rate:.4f}%"
+              f"  SOFR={sofr:.4f}%  basis≈{basis_bp:+.1f}bp  ✓")
         return basis_bp
 
     except ImportError:
