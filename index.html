@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIBOR · SOFR · 恒生科技 监控台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400&display=swap');
+  :root {
+    --bg:#0a0c0f; --bg2:#111418; --bg3:#181c22;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --text:#e2e4e8; --muted:#6b7280; --dim:#3d4350;
+    --teal:#2dd4bf; --teal-dim:rgba(45,212,191,0.12);
+    --amber:#fbbf24; --amber-dim:rgba(251,191,36,0.12);
+    --red:#f87171; --red-dim:rgba(248,113,113,0.1);
+    --green:#4ade80; --green-dim:rgba(74,222,128,0.1);
+    --blue:#60a5fa; --purple:#a78bfa; --pink:#f472b6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;min-height:100vh;padding:28px 24px;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0;}
+  .container{position:relative;z-index:1;max-width:1280px;margin:0 auto;}
+
+  /* header */
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;}
+  .header-left h1{font-family:'Noto Serif SC',serif;font-size:22px;font-weight:300;letter-spacing:0.04em;color:#fff;margin-bottom:4px;}
+  .header-left p{color:var(--muted);font-size:11px;letter-spacing:0.08em;}
+  .header-right{text-align:right;}
+  .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:6px;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .update-time{font-size:11px;color:var(--muted);}
+
+  /* section label */
+  .section-label{font-size:10px;color:var(--dim);letter-spacing:0.14em;text-transform:uppercase;margin:20px 0 10px;padding-left:2px;border-left:2px solid var(--dim);padding-left:8px;}
+
+  /* kpi row */
+  .kpi-row{display:grid;gap:10px;margin-bottom:4px;}
+  .kpi-row-4{grid-template-columns:repeat(4,1fr);}
+  .kpi-row-3{grid-template-columns:repeat(3,1fr);}
+  .kpi{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color .2s;}
+  .kpi:hover{border-color:var(--border2);}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+  .kpi.teal::before{background:linear-gradient(90deg,transparent,var(--teal),transparent);}
+  .kpi.amber::before{background:linear-gradient(90deg,transparent,var(--amber),transparent);}
+  .kpi.red::before{background:linear-gradient(90deg,transparent,var(--red),transparent);}
+  .kpi.green::before{background:linear-gradient(90deg,transparent,var(--green),transparent);}
+  .kpi.blue::before{background:linear-gradient(90deg,transparent,var(--blue),transparent);}
+  .kpi.purple::before{background:linear-gradient(90deg,transparent,var(--purple),transparent);}
+  .kpi.pink::before{background:linear-gradient(90deg,transparent,var(--pink),transparent);}
+  .kpi-label{font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+  .kpi-val{font-size:26px;font-weight:500;line-height:1;margin-bottom:3px;}
+  .kpi.teal .kpi-val{color:var(--teal);}
+  .kpi.amber .kpi-val{color:var(--amber);}
+  .kpi.red .kpi-val{color:var(--red);}
+  .kpi.green .kpi-val{color:var(--green);}
+  .kpi.blue .kpi-val{color:var(--blue);}
+  .kpi.purple .kpi-val{color:var(--purple);}
+  .kpi.pink .kpi-val{color:var(--pink);}
+  .kpi-sub{font-size:10px;color:var(--muted);}
+  .signal{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:500;letter-spacing:0.06em;margin-top:7px;}
+  .signal.bullish{background:var(--green-dim);color:var(--green);border:0.5px solid rgba(74,222,128,0.2);}
+  .signal.bearish{background:var(--red-dim);color:var(--red);border:0.5px solid rgba(248,113,113,0.2);}
+  .signal.neutral{background:var(--teal-dim);color:var(--teal);border:0.5px solid rgba(45,212,191,0.2);}
+  .signal.warning{background:var(--amber-dim);color:var(--amber);border:0.5px solid rgba(251,191,36,0.2);}
+
+  /* charts */
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  .chart-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .chart-card.full{grid-column:1/-1;}
+  .card-title{font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;}
+  .chart-wrap{position:relative;height:170px;}
+  .chart-wrap-md{position:relative;height:190px;}
+  .chart-wrap-lg{position:relative;height:210px;}
+
+  /* spread bar */
+  .spread-bar-wrap{margin:10px 0 6px;}
+  .spread-bar-track{background:var(--bg3);border-radius:4px;height:7px;overflow:hidden;}
+  .spread-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+  .spread-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;}
+
+  /* ratio gauge */
+  .ratio-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+  .ratio-label{font-size:10px;color:var(--muted);white-space:nowrap;}
+  .ratio-track{flex:1;background:var(--bg3);border-radius:4px;height:7px;overflow:hidden;}
+  .ratio-fill{height:100%;border-radius:4px;background:var(--purple);transition:width .5s;}
+  .ratio-val{font-size:11px;color:var(--purple);min-width:42px;text-align:right;}
+
+  /* table */
+  .data-table{width:100%;border-collapse:collapse;font-size:11px;}
+  .data-table th{color:var(--muted);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;padding:5px 7px;border-bottom:0.5px solid var(--border);text-align:right;}
+  .data-table th:first-child{text-align:left;}
+  .data-table td{padding:6px 7px;border-bottom:0.5px solid var(--border);color:var(--text);text-align:right;}
+  .data-table td:first-child{text-align:left;color:var(--muted);}
+  .data-table tr:last-child td{border-bottom:none;}
+  .data-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .pos{color:var(--green);} .neg{color:var(--red);} .neu{color:var(--amber);}
+
+  /* update panel */
+  .update-panel{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:10px;}
+  .update-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+  .update-grid-2{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;align-items:end;}
+  .inp-group label{font-size:10px;color:var(--muted);letter-spacing:0.08em;display:block;margin-bottom:4px;}
+  .inp-group input{width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 10px;outline:none;transition:border-color .2s;}
+  .inp-group input:focus{border-color:var(--teal);}
+  .inp-group input.eth{border-color:rgba(160,130,250,0.3);}
+  .inp-group input.eth:focus{border-color:var(--purple);}
+  .btn{background:var(--teal);color:#0a0c0f;border:none;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;padding:8px 16px;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
+  .btn:hover{opacity:0.85;}
+  .inp-divider{font-size:10px;color:var(--dim);letter-spacing:0.1em;margin:10px 0 8px;padding-top:10px;border-top:0.5px solid var(--border);}
+
+  /* interp */
+  .interp{background:var(--bg3);border-left:2px solid var(--teal);border-radius:0 6px 6px 0;padding:10px 13px;font-size:11px;color:var(--muted);line-height:1.75;margin-top:12px;}
+  .interp strong{color:var(--text);font-weight:500;}
+
+  .footer{margin-top:20px;padding-top:14px;border-top:0.5px solid var(--border);font-size:10px;color:var(--dim);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>HIBOR · SOFR · 恒生科技 监控台</h1>
+      <p>HONG KONG LIQUIDITY + ETF RELATIVE STRENGTH · 付鹏框架辅助工具 v2</p>
+    </div>
+    <div class="header-right">
+      <div><span class="live-dot"></span><span class="update-time" id="updateTime">数据已加载</span></div>
+      <div style="margin-top:5px;font-size:10px;color:var(--dim)">日级更新 · 内置演示数据</div>
+    </div>
+  </div>
+
+  <!-- ① 利率区 -->
+  <div class="section-label">① 港元流动性</div>
+  <div class="kpi-row kpi-row-4" style="margin-bottom:10px;">
+    <div class="kpi teal">
+      <div class="kpi-label">HIBOR 3M</div>
+      <div class="kpi-val" id="kpi-hibor">—</div>
+      <div class="kpi-sub">港元3个月同业拆借</div>
+      <div class="signal neutral" id="sig-hibor">— 加载中</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-label">Term SOFR 3M</div>
+      <div class="kpi-val" id="kpi-sofr">—</div>
+      <div class="kpi-sub">美元3个月基准</div>
+      <div class="signal warning" id="sig-sofr">参照基准</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">利差 HIBOR−SOFR</div>
+      <div class="kpi-val" id="kpi-spread">—</div>
+      <div class="kpi-sub">核心流动性信号</div>
+      <div class="signal neutral" id="sig-spread">— 计算中</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">南向资金（今日）</div>
+      <div class="kpi-val" id="kpi-south">—</div>
+      <div class="kpi-sub">亿港元，净买入</div>
+      <div class="signal neutral" id="sig-south">— 计算中</div>
+    </div>
+  </div>
+
+  <!-- ② ETF区 -->
+  <div class="section-label">② ETF 相对强弱 · 3033 恒生科技 vs 3110 恒生高股息</div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:10px;">
+    <div class="kpi blue">
+      <div class="kpi-label">3033 恒生科技 ETF</div>
+      <div class="kpi-val" id="kpi-3033">—</div>
+      <div class="kpi-sub">港元，收盘价</div>
+      <div class="signal neutral" id="sig-3033">— 加载中</div>
+    </div>
+    <div class="kpi pink">
+      <div class="kpi-label">3110 恒生高股息 ETF</div>
+      <div class="kpi-val" id="kpi-3110">—</div>
+      <div class="kpi-sub">港元，收盘价</div>
+      <div class="signal neutral" id="sig-3110">— 加载中</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">价差比值 3033÷3110</div>
+      <div class="kpi-val" id="kpi-ratio">—</div>
+      <div class="kpi-sub">科技/红利相对强弱</div>
+      <div class="signal neutral" id="sig-ratio">— 计算中</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">HIBOR 3M vs Term SOFR 3M · 近60日</div>
+      <div class="chart-wrap"><canvas id="chartRates"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">HIBOR−SOFR 利差 (bp) · 近60日</div>
+      <div class="chart-wrap"><canvas id="chartSpread"></canvas></div>
+      <div class="spread-bar-wrap">
+        <div class="spread-bar-track"><div class="spread-bar-fill" id="spreadBar" style="width:50%"></div></div>
+        <div class="spread-labels"><span>宽松 −50bp</span><span>中性 0</span><span>偏紧 +50bp</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2: ETF -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">3033 恒生科技 · 3110 恒生高股息 价格走势</div>
+      <div class="chart-wrap-md"><canvas id="chartETF"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">3033÷3110 比值 · 科技/红利相对强弱</div>
+      <div class="chart-wrap-md"><canvas id="chartRatio"></canvas></div>
+      <div class="ratio-row">
+        <span class="ratio-label">当前分位（60日）</span>
+        <div class="ratio-track"><div class="ratio-fill" id="ratioBar" style="width:50%"></div></div>
+        <span class="ratio-val" id="ratioBarLabel">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Row 3: 联动 -->
+  <div class="charts-grid">
+    <div class="chart-card full">
+      <div class="card-title">核心联动：HIBOR−SOFR 利差 vs 3033÷3110 比值 vs 南向资金</div>
+      <div class="chart-wrap-lg"><canvas id="chartOverlay"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="chart-card" style="margin-bottom:10px;">
+    <div class="card-title">近期数据明细</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>HIBOR</th>
+          <th>SOFR</th>
+          <th>利差(bp)</th>
+          <th>3033</th>
+          <th>3110</th>
+          <th>比值</th>
+          <th>南向(亿)</th>
+          <th>综合信号</th>
+        </tr>
+      </thead>
+      <tbody id="dataTable"></tbody>
+    </table>
+    <div class="interp" id="interp">正在生成解读...</div>
+  </div>
+
+  <!-- Update Panel -->
+  <div class="update-panel">
+    <div class="card-title" style="margin-bottom:10px;">手动更新今日数据</div>
+    <div class="update-grid">
+      <div class="inp-group"><label>HIBOR 3M (%)</label><input type="number" id="inp-hibor" placeholder="e.g. 4.82" step="0.01"></div>
+      <div class="inp-group"><label>Term SOFR 3M (%)</label><input type="number" id="inp-sofr" placeholder="e.g. 5.31" step="0.01"></div>
+      <div class="inp-group"><label>南向资金净流入（亿港元）</label><input type="number" id="inp-south" placeholder="e.g. 52.3" step="0.1"></div>
+    </div>
+    <div class="inp-divider">ETF 收盘价</div>
+    <div class="update-grid-2">
+      <div class="inp-group"><label>3033 恒生科技 ETF（港元）</label><input class="eth" type="number" id="inp-3033" placeholder="e.g. 9.42" step="0.01"></div>
+      <div class="inp-group"><label>3110 恒生高股息 ETF（港元）</label><input class="eth" type="number" id="inp-3110" placeholder="e.g. 7.85" step="0.01"></div>
+      <div class="inp-group"><label>&nbsp;</label></div>
+      <button class="btn" onclick="addTodayData()">更新 →</button>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--dim);line-height:1.8;">
+      HIBOR → hkab.org.hk &nbsp;|&nbsp; Term SOFR → cmegroup.com &nbsp;|&nbsp; 南向 → hkex.com.hk/Mutual-Market &nbsp;|&nbsp; 3033/3110 → 港交所或券商行情
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>仅供研究参考，不构成投资建议</span>
+    <span>付鹏宏观框架辅助工具 v2.0 · HIBOR·SOFR·3033·3110</span>
+  </div>
+</div>
+
+<script>
+// ── 生成日期序列 ──
+function genDates(n){
+  const d=new Date(),arr=[];
+  for(let i=n-1;i>=0;i--){const dd=new Date(d);dd.setDate(d.getDate()-i);arr.push(dd.toISOString().slice(0,10));}
+  return arr;
+}
+const DATES=genDates(60);
+
+// ── 内置演示数据 ──
+const HIBOR=DATES.map((_,i)=>+(5.15-i*0.008+Math.sin(i*0.4)*0.06+(Math.random()-0.5)*0.04).toFixed(4));
+const SOFR =DATES.map((_,i)=>+(5.32-i*0.007+Math.sin(i*0.35)*0.04+(Math.random()-0.5)*0.03).toFixed(4));
+const SPREAD=HIBOR.map((h,i)=>+((h-SOFR[i])*100).toFixed(2));
+const SOUTH =SPREAD.map((s,i)=>+(-s*1.8+30+Math.sin(i*0.5)*15+(Math.random()-0.5)*20).toFixed(1));
+
+// 3033 恒生科技：从8.2附近随宽松环境缓步回升，有弹性
+const ETF3033=DATES.map((_,i)=>{
+  const base=8.2+i*0.018+Math.sin(i*0.45)*0.25+(Math.random()-0.5)*0.12;
+  return +Math.max(7.5,base).toFixed(3);
+});
+// 3110 恒生高股息：相对稳定，波动小，缓慢上行
+const ETF3110=DATES.map((_,i)=>{
+  const base=7.6+i*0.009+Math.sin(i*0.3)*0.12+(Math.random()-0.5)*0.07;
+  return +Math.max(7.2,base).toFixed(3);
+});
+// 比值
+const RATIO=ETF3033.map((v,i)=>+(v/ETF3110[i]).toFixed(4));
+
+let data={dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],etf3110:[...ETF3110],ratio:[...RATIO]};
+
+// ── 图表共用配置 ──
+const mono="'IBM Plex Mono',monospace";
+Chart.defaults.color='#6b7280';
+Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+Chart.defaults.font.family=mono;
+Chart.defaults.font.size=10;
+
+function tt(color){return{backgroundColor:'#181c22',borderColor:color,borderWidth:0.5,titleColor:'#e2e4e8',bodyColor:'#9ca3af',padding:8,displayColors:false};}
+const baseScales={
+  x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{maxTicksLimit:8,maxRotation:0}},
+  y:{grid:{color:'rgba(255,255,255,0.04)'}}
+};
+const baseOpts={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:baseScales,elements:{point:{radius:0,hoverRadius:4}}};
+
+let chartRates,chartSpread,chartETF,chartRatio,chartOverlay;
+
+function initCharts(){
+  const labels=data.dates;
+
+  // 1. HIBOR vs SOFR
+  chartRates=new Chart(document.getElementById('chartRates'),{
+    type:'line',data:{labels,datasets:[
+      {label:'HIBOR 3M',data:data.hibor,borderColor:'#2dd4bf',borderWidth:1.5,tension:0.4,fill:false},
+      {label:'Term SOFR 3M',data:data.sofr,borderColor:'#fbbf24',borderWidth:1.5,tension:0.4,borderDash:[4,3],fill:false}
+    ]},
+    options:{...baseOpts,plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#2dd4bf'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y.toFixed(3)}%`}}},
+    scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+
+  // 2. Spread bar chart
+  const spColors=data.spread.map(s=>s<-10?'rgba(74,222,128,0.7)':s>10?'rgba(248,113,113,0.7)':'rgba(45,212,191,0.7)');
+  chartSpread=new Chart(document.getElementById('chartSpread'),{
+    type:'bar',data:{labels,datasets:[{label:'利差(bp)',data:data.spread,backgroundColor:spColors,borderRadius:2,borderSkipped:false}]},
+    options:{...baseOpts,plugins:{tooltip:{...tt('#2dd4bf'),callbacks:{label:c=>` 利差: ${c.parsed.y.toFixed(1)} bp`}}},
+    scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v+'bp'}}}}
+  });
+
+  // 3. ETF双价格（双轴，价格接近可共轴）
+  chartETF=new Chart(document.getElementById('chartETF'),{
+    type:'line',data:{labels,datasets:[
+      {label:'3033 恒生科技',data:data.etf3033,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'y'},
+      {label:'3110 恒生高股息',data:data.etf3110,borderColor:'#f472b6',borderWidth:1.8,tension:0.4,borderDash:[5,3],fill:false,yAxisID:'y2'}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#60a5fa')}},
+      scales:{
+        x:baseScales.x,
+        y:{...baseScales.y,position:'left',ticks:{callback:v=>'$'+v.toFixed(2)}},
+        y2:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>'$'+v.toFixed(2)}}
+      }
+    }
+  });
+
+  // 4. Ratio 3033/3110
+  const ratioColors=data.ratio.map((_,i)=>{
+    if(i===0)return'rgba(167,139,250,0.6)';
+    return data.ratio[i]>data.ratio[i-1]?'rgba(96,165,250,0.7)':'rgba(244,114,182,0.6)';
+  });
+  chartRatio=new Chart(document.getElementById('chartRatio'),{
+    type:'line',data:{labels,datasets:[
+      {label:'3033÷3110',data:data.ratio,borderColor:'#a78bfa',borderWidth:1.8,tension:0.4,
+       fill:{target:'origin',above:'rgba(96,165,250,0.05)',below:'rgba(244,114,182,0.05)'},
+       pointBackgroundColor:ratioColors,pointRadius:0,pointHoverRadius:4}
+    ]},
+    options:{...baseOpts,plugins:{tooltip:{...tt('#a78bfa'),callbacks:{label:c=>` 比值: ${c.parsed.y.toFixed(4)}`}}},
+    scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(3)}}}}
+  });
+
+  // 5. Overlay: spread + ratio + south (三轴)
+  chartOverlay=new Chart(document.getElementById('chartOverlay'),{
+    type:'line',data:{labels,datasets:[
+      {label:'利差(bp)',data:data.spread,borderColor:'#2dd4bf',borderWidth:1.5,tension:0.4,
+       fill:{target:'origin',above:'rgba(248,113,113,0.07)',below:'rgba(74,222,128,0.07)'},yAxisID:'y'},
+      {label:'3033÷3110 比值',data:data.ratio,borderColor:'#a78bfa',borderWidth:1.5,tension:0.4,borderDash:[5,3],fill:false,yAxisID:'y2'},
+      {label:'南向净流(亿)',data:data.south,borderColor:'#fbbf24',borderWidth:1,tension:0.4,borderDash:[2,4],fill:false,yAxisID:'y3'}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#2dd4bf')}},
+      scales:{
+        x:baseScales.x,
+        y:{...baseScales.y,position:'left',ticks:{callback:v=>v+'bp'},title:{display:true,text:'利差bp',color:'#2dd4bf',font:{size:9}}},
+        y2:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v.toFixed(3)},title:{display:true,text:'比值',color:'#a78bfa',font:{size:9}}},
+        y3:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'亿'},title:{display:true,text:'南向亿',color:'#fbbf24',font:{size:9}},offset:true}
+      }
+    }
+  });
+}
+
+// ── KPI更新 ──
+function updateKPI(){
+  const i=data.dates.length-1;
+  const h=data.hibor[i],s=data.sofr[i],sp=data.spread[i],so=data.south[i];
+  const p3=data.etf3033[i],p1=data.etf3110[i],r=data.ratio[i];
+
+  document.getElementById('kpi-hibor').textContent=h.toFixed(3)+'%';
+  document.getElementById('kpi-sofr').textContent=s.toFixed(3)+'%';
+  document.getElementById('kpi-spread').textContent=(sp>=0?'+':'')+sp.toFixed(1)+'bp';
+  document.getElementById('kpi-south').textContent=(so>=0?'+':'')+so.toFixed(1);
+  document.getElementById('kpi-3033').textContent='$'+p3.toFixed(3);
+  document.getElementById('kpi-3110').textContent='$'+p1.toFixed(3);
+  document.getElementById('kpi-ratio').textContent=r.toFixed(4);
+
+  // HIBOR信号
+  const hChg=h-data.hibor[Math.max(0,i-5)];
+  const siH=document.getElementById('sig-hibor');
+  if(hChg<-0.05){siH.className='signal bullish';siH.textContent='↓ 港元宽松趋势';}
+  else if(hChg>0.05){siH.className='signal bearish';siH.textContent='↑ 港元偏紧趋势';}
+  else{siH.className='signal neutral';siH.textContent='→ 基本稳定';}
+
+  // 利差信号
+  const siSp=document.getElementById('sig-spread');
+  if(sp<-15){siSp.className='signal bullish';siSp.textContent='↓ 港元明显宽松';}
+  else if(sp<-5){siSp.className='signal bullish';siSp.textContent='↓ 港元小幅宽松';}
+  else if(sp>15){siSp.className='signal bearish';siSp.textContent='↑ 港元明显偏紧';}
+  else if(sp>5){siSp.className='signal warning';siSp.textContent='↑ 港元略偏紧';}
+  else{siSp.className='signal neutral';siSp.textContent='→ 利差中性';}
+
+  // 利差条
+  const pct=Math.min(100,Math.max(0,(sp+50)/100*100));
+  const bar=document.getElementById('spreadBar');
+  bar.style.width=pct+'%';
+  bar.style.background=sp<-5?'var(--green)':sp>5?'var(--red)':'var(--teal)';
+
+  // 南向信号
+  const siSo=document.getElementById('sig-south');
+  const avgS=data.south.slice(-10).reduce((a,b)=>a+b,0)/10;
+  if(so>avgS*1.5){siSo.className='signal bullish';siSo.textContent='↑ 显著高于均值';}
+  else if(so>0){siSo.className='signal bullish';siSo.textContent='↑ 净流入';}
+  else{siSo.className='signal bearish';siSo.textContent='↓ 净流出';}
+
+  // 3033信号（vs5日前）
+  const si3033=document.getElementById('sig-3033');
+  const chg3033=p3-data.etf3033[Math.max(0,i-5)];
+  const pct3033=(chg3033/data.etf3033[Math.max(0,i-5)]*100).toFixed(1);
+  if(chg3033>0){si3033.className='signal bullish';si3033.textContent=`↑ +${pct3033}% (5日)`;}
+  else{si3033.className='signal bearish';si3033.textContent=`↓ ${pct3033}% (5日)`;}
+
+  // 3110信号
+  const si3110=document.getElementById('sig-3110');
+  const chg3110=p1-data.etf3110[Math.max(0,i-5)];
+  const pct3110=(chg3110/data.etf3110[Math.max(0,i-5)]*100).toFixed(1);
+  if(chg3110>0){si3110.className='signal bullish';si3110.textContent=`↑ +${pct3110}% (5日)`;}
+  else{si3110.className='signal bearish';si3110.textContent=`↓ ${pct3110}% (5日)`;}
+
+  // 比值信号 + 分位
+  const siR=document.getElementById('sig-ratio');
+  const rMin=Math.min(...data.ratio),rMax=Math.max(...data.ratio);
+  const rPct=Math.round((r-rMin)/(rMax-rMin)*100);
+  document.getElementById('ratioBar').style.width=rPct+'%';
+  document.getElementById('ratioBarLabel').textContent=rPct+'%分位';
+  const rChg=r-data.ratio[Math.max(0,i-5)];
+  if(rChg>0.005){siR.className='signal bullish';siR.textContent='↑ 科技跑赢红利';}
+  else if(rChg<-0.005){siR.className='signal bearish';siR.textContent='↓ 红利跑赢科技';}
+  else{siR.className='signal neutral';siR.textContent='→ 比值横盘';}
+
+  document.getElementById('updateTime').textContent='最后更新: '+new Date().toLocaleString('zh-HK');
+}
+
+// ── 数据表 ──
+function updateTable(){
+  const tbody=document.getElementById('dataTable');
+  const rows=[];
+  const n=Math.min(10,data.dates.length);
+  for(let i=data.dates.length-1;i>=data.dates.length-n;i--){
+    const sp=data.spread[i],so=data.south[i],r=data.ratio[i];
+    const rPrev=i>0?data.ratio[i-1]:r;
+    let sig,cls;
+    if(sp<-10&&so>20&&r>rPrev){sig='🟢 宽松+南下+科技强';cls='pos';}
+    else if(sp>10&&so<0&&r<rPrev){sig='🔴 偏紧+流出+红利强';cls='neg';}
+    else if(sp<0&&r>rPrev){sig='🔵 宽松+科技占优';cls='pos';}
+    else if(sp>0&&r<rPrev){sig='🟡 偏紧+红利防御';cls='neu';}
+    else{sig='⚪ 中性';cls='';}
+    rows.push(`<tr>
+      <td>${data.dates[i]}</td>
+      <td>${data.hibor[i].toFixed(3)}%</td>
+      <td>${data.sofr[i].toFixed(3)}%</td>
+      <td class="${sp<0?'pos':sp>0?'neg':''}">${sp>=0?'+':''}${sp.toFixed(1)}</td>
+      <td>$${data.etf3033[i].toFixed(3)}</td>
+      <td>$${data.etf3110[i].toFixed(3)}</td>
+      <td class="${r>rPrev?'pos':'neg'}">${r.toFixed(4)}</td>
+      <td class="${so>0?'pos':'neg'}">${so>=0?'+':''}${so.toFixed(1)}</td>
+      <td class="${cls}">${sig}</td>
+    </tr>`);
+  }
+  tbody.innerHTML=rows.join('');
+}
+
+// ── 解读 ──
+function updateInterp(){
+  const i=data.dates.length-1;
+  const sp=data.spread[i],so=data.south[i],r=data.ratio[i];
+  const rPrev=data.ratio[Math.max(0,i-5)];
+  const rChg=((r-rPrev)/rPrev*100).toFixed(1);
+  const spAvg=data.spread.slice(-20).reduce((a,b)=>a+b,0)/20;
+
+  let t='<strong>综合解读：</strong>';
+
+  // 流动性
+  if(sp<-10)t+=`HIBOR-SOFR利差 <strong>${sp.toFixed(1)}bp</strong>，港元流动性明显宽松，利率环境有利于高估值科技股折现率下行。`;
+  else if(sp>10)t+=`HIBOR-SOFR利差 <strong>+${sp.toFixed(1)}bp</strong>，港元偏紧，科技股估值承压，红利股相对防御价值上升。`;
+  else t+=`HIBOR-SOFR利差 <strong>${sp>=0?'+':''}${sp.toFixed(1)}bp</strong>，港元流动性中性。`;
+
+  // 比值
+  if(r>rPrev)t+=` 3033÷3110比值近5日上升 <strong>+${rChg}%</strong>，科技相对红利占优，与利率宽松逻辑共振。`;
+  else t+=` 3033÷3110比值近5日下降 <strong>${rChg}%</strong>，红利相对防御，留意利率环境是否有转向迹象。`;
+
+  // 南向
+  if(so>30)t+=` 南向净流入 <strong>${so.toFixed(1)}亿</strong>，三者共振（宽松+科技强+资金流入），关注恒生科技短期动能。`;
+  else if(so<-10)t+=` 南向净流出 <strong>${Math.abs(so).toFixed(1)}亿</strong>，需结合人民币汇率判断换汇意愿是否减弱。`;
+
+  t+=' <strong>关键逻辑：</strong>HIBOR下行→融资成本降低→科技估值修复→3033/3110比值走阔，是付鹏框架下的完整链条。利差走阔时应警惕科技仓位。';
+  document.getElementById('interp').innerHTML=t;
+}
+
+// ── 手动更新 ──
+function addTodayData(){
+  const h=parseFloat(document.getElementById('inp-hibor').value);
+  const s=parseFloat(document.getElementById('inp-sofr').value);
+  const so=parseFloat(document.getElementById('inp-south').value);
+  const p3=parseFloat(document.getElementById('inp-3033').value);
+  const p1=parseFloat(document.getElementById('inp-3110').value);
+  if([h,s,so,p3,p1].some(isNaN)){alert('请填写全部五个数值');return;}
+  const sp=+((h-s)*100).toFixed(2);
+  const r=+(p3/p1).toFixed(4);
+  const today=new Date().toISOString().slice(0,10);
+
+  data.dates.push(today);data.hibor.push(h);data.sofr.push(s);
+  data.spread.push(sp);data.south.push(so);
+  data.etf3033.push(p3);data.etf3110.push(p1);data.ratio.push(r);
+
+  // 图表追加
+  [chartRates,chartSpread,chartETF,chartRatio,chartOverlay].forEach(c=>{c.data.labels.push(today);});
+  chartRates.data.datasets[0].data.push(h);
+  chartRates.data.datasets[1].data.push(s);
+  chartSpread.data.datasets[0].data.push(sp);
+  chartSpread.data.datasets[0].backgroundColor.push(sp<-10?'rgba(74,222,128,0.7)':sp>10?'rgba(248,113,113,0.7)':'rgba(45,212,191,0.7)');
+  chartETF.data.datasets[0].data.push(p3);
+  chartETF.data.datasets[1].data.push(p1);
+  chartRatio.data.datasets[0].data.push(r);
+  chartOverlay.data.datasets[0].data.push(sp);
+  chartOverlay.data.datasets[1].data.push(r);
+  chartOverlay.data.datasets[2].data.push(so);
+  [chartRates,chartSpread,chartETF,chartRatio,chartOverlay].forEach(c=>c.update());
+
+  updateKPI();updateTable();updateInterp();
+  ['inp-hibor','inp-sofr','inp-south','inp-3033','inp-3110'].forEach(id=>{document.getElementById(id).value='';});
+}
+
+// ── Init ──
+initCharts();updateKPI();updateTable();updateInterp();
+</script>
+</body>
+</html>
