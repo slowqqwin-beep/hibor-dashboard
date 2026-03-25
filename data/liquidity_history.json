@@ -2,16 +2,19 @@
   {
     "date": "2026-03-25",
     "onrrp": 1.123,
-    "reserves": 3019.99,
-    "tga": 853.05,
-    "tga_wow": 14.87,
-    "sofr": 3.62,
+    "reserves": 3019.995,
+    "tga": 853.052,
+    "tga_wow": 14.866,
+    "sofr": 3.63,
     "iorb": 3.65,
     "effr": 3.64,
-    "sofr90": 3.68594,
+    "sofr90": 3.68561,
+    "sofr90_src": "SOFR90DAYAVG",
     "dw": 3.75,
     "srf": 0.0,
-    "sofr_iorb_bp": -3.0,
-    "sofr_effr_bp": -2.0
+    "jpy": -39796.4,
+    "sofr_iorb_bp": -2.0,
+    "sofr_effr_bp": -1.0,
+    "futures_price": 96.3144
   }
 ]
