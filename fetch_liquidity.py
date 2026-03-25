@@ -141,18 +141,32 @@ def save_history(history: list, record: dict) -> list:
 # ────────────────────────────────────────────────────────────────────
 # 更新 liquidity.html
 # ────────────────────────────────────────────────────────────────────
+def _load_hibor_spread(n_rows: int) -> list:
+    """从 data/history.json 读取最近 n 条 spread_bp，长度不足时补 None。"""
+    hibor_file = REPO_ROOT / "data" / "history.json"
+    if not hibor_file.exists():
+        return [None] * n_rows
+    try:
+        hist = json.loads(hibor_file.read_text(encoding="utf-8"))
+        spreads = [r.get("spread_bp") for r in hist]
+        # 按日期顺序取最后 n 条
+        return spreads[-n_rows:]
+    except Exception:
+        return [None] * n_rows
+
+
 def update_liquidity_html(history: list) -> bool:
     if not LIQUIDITY_HTML.exists():
         print(f"  WARNING: {LIQUIDITY_HTML} 不存在，跳过")
         return False
 
-    rows  = history[-60:]
+    rows      = history[-60:]
     today_str = date.today().isoformat()
 
-    def col(key, default=None):
-        return [r.get(key, default) for r in rows]
+    def col(key):
+        return [r.get(key) for r in rows]
 
-    dates      = col("date", "")
+    dates      = col("date")
     onrrp      = col("onrrp")
     reserves   = col("reserves")
     tga        = col("tga")
@@ -164,7 +178,12 @@ def update_liquidity_html(history: list) -> bool:
     srf        = col("srf")
     dw         = col("dw")
 
-    latest     = rows[-1] if rows else {}
+    # 从 history.json 读取 HIBOR-SOFR 利差（与 liquidity history 对齐日期）
+    hibor_spread = _load_hibor_spread(len(rows))
+
+    # 把最新利差写进 latest
+    latest = dict(rows[-1]) if rows else {}
+    latest["hibor_spread_bp"] = hibor_spread[-1] if hibor_spread else None
 
     new_block = (
         f"// ── 实时数据（fetch_liquidity.py 写入 {today_str}）──\n"
@@ -179,11 +198,15 @@ def update_liquidity_html(history: list) -> bool:
         f"const LIQ_SOFR90={json.dumps(sofr90)};\n"
         f"const LIQ_SRF={json.dumps(srf)};\n"
         f"const LIQ_DW={json.dumps(dw)};\n"
+        f"const LIQ_HIBOR_SPREAD={json.dumps(hibor_spread)};\n"
         f"\nconst LIQ_LATEST={json.dumps(latest, ensure_ascii=False)};"
     )
 
     html = LIQUIDITY_HTML.read_text(encoding="utf-8")
-    pattern = re.compile(r"// ── 实时数据.*?const LIQ_LATEST=\{[^;]*\};", re.DOTALL)
+    pattern = re.compile(
+        r"// ── 实时数据.*?const LIQ_LATEST=\{[^;]*\};",
+        re.DOTALL
+    )
     new_html, count = pattern.subn(new_block, html)
     if count == 0:
         print("  WARNING: liquidity.html 数据块未匹配，跳过")
