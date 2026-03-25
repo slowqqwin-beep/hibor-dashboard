@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-fetch_data.py — HIBOR · SOFR · ETF · 南向资金 数据抓取
-────────────────────────────────────────────────────────
-数据源：
-  ① HIBOR 3M       → 东方财富 API (MARKET_CODE=005, HKD, 3M)
-  ② Term SOFR 3M   → FRED API  series=SOFR90DAYAVG
-                      key 来自环境变量 FRED_API_KEY (GitHub Secrets)
+fetch_data.py v2
+────────────────────────────────────────────────────────────────
+抓取：
+  ① HIBOR 3M       → 东方财富 API
+  ② Term SOFR 3M   → FRED API  (env: FRED_API_KEY)
   ③ 3033.HK / 3110.HK → yfinance
-  ④ 南向资金净买入  → akshare stock_hsgt_hist_em(symbol='南向资金')
+  ④ 南向资金净买入  → akshare (东方财富)
+
+写入：
+  · data/history.json  —— 每日一条，最多保留 365 条
+  · index.html         —— 替换 JS 数据块（最近 60 条）
 
 依赖：pip install requests akshare yfinance
 """
@@ -15,17 +18,25 @@ fetch_data.py — HIBOR · SOFR · ETF · 南向资金 数据抓取
 import os
 import sys
 import json
+import re
 import requests
+import yfinance as yf
+import akshare as ak
+from datetime import date
+from pathlib import Path
 
 # Windows 终端 UTF-8 兼容
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-import yfinance as yf
-import akshare as ak
-from datetime import date
+
+REPO_ROOT      = Path(__file__).parent
+HISTORY_FILE   = REPO_ROOT / "data" / "history.json"
+INDEX_HTML     = REPO_ROOT / "index.html"
+MAX_CHART_DAYS = 60
+MAX_HIST_DAYS  = 365
 
 # ────────────────────────────────────────────────────────────────────
-# ① HIBOR 3M  (东方财富，MARKET_CODE=005, INDICATOR_ID=203)
+# ① HIBOR 3M
 # ────────────────────────────────────────────────────────────────────
 def fetch_hibor_3m() -> dict:
     url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
@@ -42,165 +53,252 @@ def fetch_hibor_3m() -> dict:
     }
     r = requests.get(url, params=params, timeout=15)
     r.raise_for_status()
-    d = r.json()
-    row = d["result"]["data"][0]
+    row = r.json()["result"]["data"][0]
     return {
-        "date": row["REPORT_DATE"][:10],
-        "rate": float(row["IR_RATE"]),      # 百分比，e.g. 2.30113
+        "date":       row["REPORT_DATE"][:10],
+        "rate":       float(row["IR_RATE"]),
         "change_pct": float(row["CHANGE_RATE"]),
     }
 
 
 # ────────────────────────────────────────────────────────────────────
-# ② Term SOFR 3M  (FRED, series=SOFR90DAYAVG)
+# ② Term SOFR 3M  (FRED: SOFR90DAYAVG)
 #    GitHub Secrets 变量名: FRED_API_KEY
 # ────────────────────────────────────────────────────────────────────
 def fetch_sofr_3m() -> dict:
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
-        raise EnvironmentError("FRED_API_KEY not set — add it to GitHub Secrets")
+        raise EnvironmentError("FRED_API_KEY not set")
     params = {
-        "series_id": "SOFR90DAYAVG",   # 90-day compounded avg，最接近 Term SOFR 3M
-        "api_key": api_key,
-        "file_type": "json",
+        "series_id":  "SOFR90DAYAVG",
+        "api_key":    api_key,
+        "file_type":  "json",
         "sort_order": "desc",
-        "limit": "5",
+        "limit":      "5",
     }
     r = requests.get(
         "https://api.stlouisfed.org/fred/series/observations",
-        params=params, timeout=15
+        params=params, timeout=15,
     )
     r.raise_for_status()
-    obs = r.json().get("observations", [])
-    for o in obs:
-        if o["value"] != ".":
-            return {
-                "date": o["date"],
-                "rate": float(o["value"]),  # 百分比
-            }
-    raise ValueError("FRED: no valid SOFR90DAYAVG observation found")
+    for obs in r.json().get("observations", []):
+        if obs["value"] != ".":
+            return {"date": obs["date"], "rate": float(obs["value"])}
+    raise ValueError("FRED 无有效数据")
 
 
 # ────────────────────────────────────────────────────────────────────
-# ③ ETF 收盘价  (yfinance)
+# ③ ETF 收盘价
 # ────────────────────────────────────────────────────────────────────
 def fetch_etf_prices() -> dict:
     result = {}
     for ticker in ["3033.HK", "3110.HK"]:
         hist = yf.Ticker(ticker).history(period="5d")
         if hist.empty:
-            raise ValueError(f"yfinance 返回空数据: {ticker}")
+            raise ValueError(f"yfinance 空数据: {ticker}")
         result[ticker] = {
-            "date": str(hist.index[-1].date()),
+            "date":  str(hist.index[-1].date()),
             "close": round(float(hist["Close"].iloc[-1]), 4),
         }
     return result
 
 
 # ────────────────────────────────────────────────────────────────────
-# ④ 南向资金净买入  (akshare → 东方财富)
+# ④ 南向资金
 # ────────────────────────────────────────────────────────────────────
 def fetch_southbound() -> dict:
     df = ak.stock_hsgt_hist_em(symbol="南向资金")
     if df.empty:
-        raise ValueError("akshare 南向资金返回空数据")
+        raise ValueError("akshare 返回空数据")
     last = df.iloc[-1]
-    trade_date = str(last.iloc[0])[:10]
-    net_flow = round(float(last.iloc[1]), 2)   # 亿港元，负=净流出
-    buy_total = round(float(last.iloc[2]), 2)   # 买入成交额
-    sell_total = round(float(last.iloc[3]), 2)  # 卖出成交额
     return {
-        "date": trade_date,
-        "net_flow_bn": net_flow,
-        "buy_bn": buy_total,
-        "sell_bn": sell_total,
+        "date":        str(last.iloc[0])[:10],
+        "net_flow_bn": round(float(last.iloc[1]), 2),   # 亿港元
+        "buy_bn":      round(float(last.iloc[2]), 2),
+        "sell_bn":     round(float(last.iloc[3]), 2),
     }
+
+
+# ────────────────────────────────────────────────────────────────────
+# history.json
+# ────────────────────────────────────────────────────────────────────
+def load_history() -> list:
+    if HISTORY_FILE.exists():
+        return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def save_history(history: list, record: dict) -> list:
+    today = record["date"]
+    idx = next((i for i, r in enumerate(history) if r["date"] == today), None)
+    if idx is not None:
+        history[idx] = record
+        action = "更新"
+    else:
+        history.append(record)
+        action = "追加"
+
+    history.sort(key=lambda r: r["date"])
+    history = history[-MAX_HIST_DAYS:]
+
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    print(f"  history.json: {action} {today}（共 {len(history)} 条）")
+    return history
+
+
+# ────────────────────────────────────────────────────────────────────
+# index.html —— 替换 JS 数据块
+# ────────────────────────────────────────────────────────────────────
+def update_index_html(history: list) -> bool:
+    if not INDEX_HTML.exists():
+        print(f"  WARNING: {INDEX_HTML} 不存在，跳过")
+        return False
+
+    rows = history[-MAX_CHART_DAYS:]
+    n    = len(rows)
+
+    # SOFR 缺失时向前填充
+    last_sofr = 0.0
+    sofrs = []
+    for r in rows:
+        v = r.get("sofr")
+        if v is not None:
+            last_sofr = v
+        sofrs.append(last_sofr)
+
+    dates   = [r["date"]                         for r in rows]
+    hibors  = [r["hibor"]                         for r in rows]
+    spreads = [round((hibors[i] - sofrs[i]) * 100, 2) for i in range(n)]
+    souths  = [r.get("south", 0.0)               for r in rows]
+    etf3033 = [r["etf3033"]                       for r in rows]
+    etf3110 = [r["etf3110"]                       for r in rows]
+    ratios  = [round(etf3033[i] / etf3110[i], 4) if etf3110[i] else 0.0 for i in range(n)]
+
+    today_str = date.today().isoformat()
+
+    new_block = (
+        f"// ── 实时数据（fetch_data.py 写入 {today_str}）──\n"
+        f"const DATES={json.dumps(dates)};\n"
+        f"const HIBOR={json.dumps(hibors)};\n"
+        f"const SOFR ={json.dumps(sofrs)};\n"
+        f"const SPREAD={json.dumps(spreads)};\n"
+        f"const SOUTH ={json.dumps(souths)};\n"
+        f"const ETF3033={json.dumps(etf3033)};\n"
+        f"const ETF3110={json.dumps(etf3110)};\n"
+        f"const RATIO={json.dumps(ratios)};\n\n"
+        f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
+        f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
+        f"etf3110:[...ETF3110],ratio:[...RATIO]}};"
+    )
+
+    html = INDEX_HTML.read_text(encoding="utf-8")
+    pattern = re.compile(r"const DATES=.*?let data=\{[^;]*\};", re.DOTALL)
+    new_html, count = pattern.subn(new_block, html)
+
+    if count == 0:
+        print("  WARNING: index.html 数据块未匹配，跳过")
+        return False
+
+    INDEX_HTML.write_text(new_html, encoding="utf-8")
+    print(f"  index.html: 已写入 {n} 条（最新 {today_str}）")
+    return True
 
 
 # ────────────────────────────────────────────────────────────────────
 # Main
 # ────────────────────────────────────────────────────────────────────
 def main():
-    print(f"\n{'═'*58}")
+    print(f"\n{'═' * 58}")
     print(f"  HIBOR · SOFR · ETF · 南向资金   {date.today()}")
-    print(f"{'═'*58}\n")
+    print(f"{'═' * 58}\n")
 
-    results = {}
+    today_str = date.today().isoformat()
+    record = {"date": today_str}
+    errors = []
 
     # ── ① HIBOR ──────────────────────────────────────────────────────
-    print("① HIBOR 3M (东方财富)")
+    print("① HIBOR 3M")
     try:
-        hibor = fetch_hibor_3m()
-        results["hibor"] = hibor
-        print(f"   率值 : {hibor['rate']:.4f}%")
-        print(f"   日期 : {hibor['date']}")
-        print(f"   变动 : {hibor['change_pct']:+.3f}%")
-        print("   状态 : ✓\n")
+        h = fetch_hibor_3m()
+        record["hibor"] = h["rate"]
+        print(f"   {h['rate']:.4f}%  ({h['date']})  变动 {h['change_pct']:+.3f}%  ✓")
     except Exception as e:
-        print(f"   ERROR: {e}\n")
-        results["hibor"] = None
+        print(f"   ERROR: {e}")
+        errors.append("HIBOR")
 
     # ── ② SOFR ───────────────────────────────────────────────────────
-    print("② Term SOFR 3M (FRED: SOFR90DAYAVG)")
+    print("\n② Term SOFR 3M (FRED: SOFR90DAYAVG)")
     try:
-        sofr = fetch_sofr_3m()
-        results["sofr"] = sofr
-        print(f"   率值 : {sofr['rate']:.4f}%")
-        print(f"   日期 : {sofr['date']}")
-        print("   状态 : ✓\n")
+        s = fetch_sofr_3m()
+        record["sofr"] = s["rate"]
+        print(f"   {s['rate']:.4f}%  ({s['date']})  ✓")
     except Exception as e:
-        print(f"   ERROR: {e}\n")
-        results["sofr"] = None
+        print(f"   ERROR: {e}")
+        # 向前填充：用 history.json 最近一条有效 sofr
+        hist_tmp = load_history()
+        last = next((r["sofr"] for r in reversed(hist_tmp) if r.get("sofr")), None)
+        if last:
+            record["sofr"] = last
+            print(f"   使用上次已知值 {last:.4f}%（填充）")
+        else:
+            errors.append("SOFR")
 
     # ── ③ ETF ────────────────────────────────────────────────────────
-    print("③ ETF 收盘价 (yfinance)")
+    print("\n③ ETF 收盘价")
     try:
         etfs = fetch_etf_prices()
-        results["etf"] = etfs
+        record["etf3033"] = etfs["3033.HK"]["close"]
+        record["etf3110"] = etfs["3110.HK"]["close"]
         for tk, v in etfs.items():
-            print(f"   {tk} : HK${v['close']:.3f}  ({v['date']})")
-        print("   状态 : ✓\n")
+            print(f"   {tk}: HK${v['close']:.3f}  ({v['date']})  ✓")
     except Exception as e:
-        print(f"   ERROR: {e}\n")
-        results["etf"] = None
+        print(f"   ERROR: {e}")
+        errors.append("ETF")
 
     # ── ④ 南向 ───────────────────────────────────────────────────────
-    print("④ 南向资金 (akshare → 东方财富)")
+    print("\n④ 南向资金")
     try:
         south = fetch_southbound()
-        results["southbound"] = south
-        flow_label = f"{south['net_flow_bn']:+.2f} 亿港元"
-        print(f"   净买入 : {flow_label}  ({'流入' if south['net_flow_bn'] > 0 else '流出'})")
-        print(f"   买入额 : {south['buy_bn']:.2f} 亿")
-        print(f"   卖出额 : {south['sell_bn']:.2f} 亿")
-        print(f"   日期   : {south['date']}")
-        print("   状态   : ✓\n")
+        record["south"] = south["net_flow_bn"]
+        label = "流入" if south["net_flow_bn"] > 0 else "流出"
+        print(f"   净买入 {south['net_flow_bn']:+.2f} 亿港元（{label}）"
+              f"  买 {south['buy_bn']:.1f}  卖 {south['sell_bn']:.1f}  ✓")
     except Exception as e:
-        print(f"   ERROR: {e}\n")
-        results["southbound"] = None
+        print(f"   ERROR: {e}")
+        errors.append("南向资金")
 
-    # ── 衍生计算 ─────────────────────────────────────────────────────
-    h = results.get("hibor")
-    s = results.get("sofr")
-    if h and s:
-        spread_bp = (h["rate"] - s["rate"]) * 100
-        print(f"{'─'*40}")
-        print(f"  利差 HIBOR−SOFR : {spread_bp:+.1f} bp")
-        if spread_bp < -10:
-            print("  信号            : ↓ 港元明显宽松")
-        elif spread_bp > 10:
-            print("  信号            : ↑ 港元偏紧")
-        else:
-            print("  信号            : → 利差中性")
-        print(f"{'─'*40}")
+    # ── 利差 ─────────────────────────────────────────────────────────
+    if "hibor" in record and "sofr" in record:
+        spread = (record["hibor"] - record["sofr"]) * 100
+        record["spread_bp"] = round(spread, 2)
+        signal = "港元宽松" if spread < -10 else ("港元偏紧" if spread > 10 else "利差中性")
+        print(f"\n  利差 HIBOR−SOFR : {spread:+.1f} bp  →  {signal}")
 
-    etf = results.get("etf")
-    if etf and "3033.HK" in etf and "3110.HK" in etf:
-        ratio = etf["3033.HK"]["close"] / etf["3110.HK"]["close"]
+    if "etf3033" in record and "etf3110" in record:
+        ratio = round(record["etf3033"] / record["etf3110"], 4)
         print(f"  3033÷3110 比值  : {ratio:.4f}")
 
-    print()
-    return results
+    # ── 必要字段检查 ─────────────────────────────────────────────────
+    required = {"hibor", "etf3033", "etf3110"}
+    if not required.issubset(record.keys()):
+        missing = required - record.keys()
+        print(f"\n  ✗ 关键数据缺失 {missing}，不写入，退出")
+        sys.exit(1)
+
+    # ── 写入 ─────────────────────────────────────────────────────────
+    print("\n── 写入 ──────────────────────────────────────────────────")
+    history = load_history()
+    history = save_history(history, record)
+    update_index_html(history)
+
+    if errors:
+        print(f"\n  注意：{', '.join(errors)} 数据获取失败，其余已写入")
+    else:
+        print("\n  全部完成 ✓")
 
 
 if __name__ == "__main__":
