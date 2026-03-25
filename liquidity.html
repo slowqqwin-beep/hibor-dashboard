@@ -284,14 +284,14 @@
   <!-- Tier 3: Behavior -->
   <div class="section-label">第三层 · 行为信号（BEHAVIOR）</div>
   <div class="ind-grid ind-grid-3">
-    <div class="ind-card status-na" id="card-jpy">
-      <div class="ind-name">JPY 货币基差</div>
-      <div class="ind-val" style="color:var(--dim)">待接入</div>
-      <div class="ind-unit">基点 · USD/JPY Cross-currency basis</div>
+    <div class="ind-card" id="card-jpy">
+      <div class="ind-name">JPY/USD 货币基差</div>
+      <div class="ind-val" id="val-jpy">--</div>
+      <div class="ind-unit">基点 · yfinance + FRED 近似估算</div>
       <div class="sparkline-wrap" id="spark-jpy"></div>
       <div class="ind-meta">
-        <span class="ind-chg">--</span>
-        <span class="ind-status status-badge-na">待接入</span>
+        <span class="ind-chg" id="chg-jpy">--</span>
+        <span class="ind-status" id="badge-jpy">--</span>
       </div>
       <div class="threshold-info">警戒 &lt;-50bp（套利平仓压力）</div>
     </div>
@@ -372,6 +372,7 @@ const THRESHOLDS = {
   sofr_iorb:    { red:15,    amber:10,    dir:'gt' },
   sofr_effr:    { red:10,    amber:5,     dir:'gt' },
   sofr_futures: { red:96.40, amber:96.70, dir:'lt' },
+  jpy:          { red:-50,   amber:-30,   dir:'lt' },
   srf:          { red:30,    amber:10,    dir:'gt' },
   dw:           { red:5,     amber:2,     dir:'gt' },
 };
@@ -436,14 +437,14 @@ function setLight(id, st) {
 
 // ── 仓位信号逻辑 ──
 function computePosition(st, hibor_spread_bp) {
-  const vals      = Object.values(st);
+  const vals      = Object.values(st).filter(s=>s!=='na');  // 排除待接入
   const redCnt    = vals.filter(s=>s==='red').length;
   const amberCnt  = vals.filter(s=>s==='amber').length;
 
   // 三级各有红 = 三级全红
   const tier1Red  = [st.onrrp,st.reserves,st.tga].some(s=>s==='red');
   const tier2Red  = [st.sofr_iorb,st.sofr_effr,st.sofr_futures].some(s=>s==='red');
-  const tier3Red  = [st.srf,st.dw].some(s=>s==='red');
+  const tier3Red  = [st.jpy,st.srf,st.dw].some(s=>s==='red');  // jpy 有值时纳入
   const allRed    = tier1Red && tier2Red && tier3Red;
 
   // ── 主仓位 ──
@@ -508,6 +509,10 @@ function updateDashboard() {
   const tga_wow       = latest.tga_wow;
   const hibor_spread  = latest.hibor_spread_bp !== undefined ? latest.hibor_spread_bp : (LIQ_HIBOR_SPREAD.length ? LIQ_HIBOR_SPREAD[LIQ_HIBOR_SPREAD.length-1] : null);
 
+  // JPY basis: 从数组取最新值（可能为 null）
+  const jpy_val = (typeof LIQ_JPY !== 'undefined' && LIQ_JPY.length)
+    ? LIQ_JPY[LIQ_JPY.length - 1] : (latest.jpy !== undefined ? latest.jpy : null);
+
   // 状态
   const st = {
     onrrp:        getStatus(latest.onrrp,  'onrrp'),
@@ -516,6 +521,7 @@ function updateDashboard() {
     sofr_iorb:    getStatus(sofr_iorb_bp,   'sofr_iorb'),
     sofr_effr:    getStatus(sofr_effr_bp,   'sofr_effr'),
     sofr_futures: getStatus(sofr_futures,   'sofr_futures'),
+    jpy:          getStatus(jpy_val,        'jpy'),
     srf:          getStatus(latest.srf,     'srf'),
     dw:           getStatus(latest.dw,      'dw'),
   };
@@ -556,6 +562,11 @@ function updateDashboard() {
   setLight('sofr-fut', st.sofr_futures);
   setLight('srf',      st.srf);
   setLight('dw',       st.dw);
+  // JPY 灯（第三行第三个，on-na 时默认已设置在 HTML 中）
+  const jpyLightEl = document.querySelector('#pos-lights .lights-row:last-of-type .light:last-child');
+  if (jpyLightEl && st.jpy !== 'na') {
+    jpyLightEl.className = 'light on-' + (st.jpy === 'red' ? 'red' : st.jpy === 'amber' ? 'amber' : 'green');
+  }
 
   // 计数
   const statList = Object.values(st);
@@ -621,6 +632,24 @@ function updateDashboard() {
   document.getElementById('badge-dw').outerHTML      = statusBadge(st.dw);
   setCard('dw',st.dw);
   drawSparkline('spark-dw', LIQ_DW, SPARK_COLOR[st.dw], SPARK_FILL[st.dw]);
+
+  // JPY
+  const jpy_arr = (typeof LIQ_JPY !== 'undefined') ? LIQ_JPY : [];
+  const jpy_prev = jpy_arr.length >= 2 ? jpy_arr[jpy_arr.length - 2] : null;
+  if (st.jpy === 'na') {
+    document.getElementById('val-jpy').textContent  = '待接入';
+    document.getElementById('val-jpy').style.color  = 'var(--dim)';
+    document.getElementById('chg-jpy').innerHTML    = '';
+    document.getElementById('badge-jpy').outerHTML  = statusBadge('na', '待接入');
+    setCard('jpy', 'na');
+  } else {
+    document.getElementById('val-jpy').textContent  = (jpy_val > 0 ? '+' : '') + fmtNum(jpy_val, 1);
+    document.getElementById('val-jpy').style.color  = SPARK_COLOR[st.jpy];
+    document.getElementById('chg-jpy').innerHTML    = fmtChg(jpy_val, jpy_prev);
+    document.getElementById('badge-jpy').outerHTML  = statusBadge(st.jpy);
+    setCard('jpy', st.jpy);
+    drawSparkline('spark-jpy', jpy_arr, SPARK_COLOR[st.jpy], SPARK_FILL[st.jpy]);
+  }
 
   // ── 历史表格 ──
   const tbody = document.getElementById('hist-tbody');
