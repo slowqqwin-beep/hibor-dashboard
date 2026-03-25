@@ -14,41 +14,73 @@
     --amber:#fbbf24; --amber-dim:rgba(251,191,36,0.12);
     --red:#f87171; --red-dim:rgba(248,113,113,0.1);
     --green:#4ade80; --green-dim:rgba(74,222,128,0.1);
-    --blue:#60a5fa; --purple:#a78bfa; --pink:#f472b6;
+    --blue:#60a5fa; --purple:#a78bfa; --orange:#fb923c;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;min-height:100vh;padding:28px 24px;}
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0;}
   .container{position:relative;z-index:1;max-width:1280px;margin:0 auto;}
 
-  /* header */
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;}
+  /* ── header ── */
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
   .header-left h1{font-family:'Noto Serif SC',serif;font-size:22px;font-weight:300;letter-spacing:0.04em;color:#fff;margin-bottom:4px;}
   .header-left p{color:var(--muted);font-size:11px;letter-spacing:0.08em;}
   .header-right{text-align:right;}
   .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:6px;animation:pulse 2s infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
   .update-time{font-size:11px;color:var(--muted);}
-
-  /* nav */
-  .nav-link{display:inline-block;font-size:11px;color:var(--muted);text-decoration:none;border:0.5px solid var(--border2);border-radius:6px;padding:4px 12px;margin-top:8px;transition:color 0.2s,border-color 0.2s;}
+  .nav-link{display:inline-block;font-size:11px;color:var(--muted);text-decoration:none;border:0.5px solid var(--border2);border-radius:6px;padding:4px 12px;margin-top:8px;transition:color .2s,border-color .2s;}
   .nav-link:hover{color:var(--teal);border-color:var(--teal);}
 
-  /* signal panel */
-  .signal-panel{background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:18px 20px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;align-items:center;}
-  .signal-score{text-align:center;padding:0 8px;}
-  .signal-score .score-val{font-size:32px;font-weight:500;line-height:1;}
-  .signal-score .score-label{font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:0.08em;}
-  .signal-divider{width:1px;background:var(--border);height:56px;margin:auto;}
-  .signal-layer{padding:0 8px;}
-  .signal-layer .layer-title{font-size:10px;color:var(--muted);letter-spacing:0.1em;margin-bottom:6px;}
-  .signal-layer .layer-val{font-size:14px;font-weight:500;}
-  .signal-layer .layer-sub{font-size:10px;color:var(--muted);margin-top:2px;}
-  .signal-reco{grid-column:4;background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:12px 14px;text-align:center;}
-  .signal-reco .reco-label{font-size:10px;color:var(--muted);letter-spacing:0.1em;margin-bottom:6px;}
-  .signal-reco .reco-val{font-size:13px;font-weight:500;}
+  /* ── 仓位信号面板（主体） ── */
+  .pos-panel{border-radius:14px;padding:0;margin-bottom:14px;overflow:hidden;border:1px solid var(--border2);transition:border-color .3s;}
+  .pos-panel.lvl-green {border-color:rgba(74,222,128,0.4);}
+  .pos-panel.lvl-lgreen{border-color:rgba(74,222,128,0.25);}
+  .pos-panel.lvl-amber {border-color:rgba(251,191,36,0.45);}
+  .pos-panel.lvl-orange{border-color:rgba(251,146,60,0.5);}
+  .pos-panel.lvl-red   {border-color:rgba(248,113,113,0.5);}
+  .pos-panel.lvl-dred  {border-color:rgba(220,38,38,0.7);}
 
-  /* alert counts */
+  .pos-header{padding:10px 20px 8px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid var(--border);}
+  .pos-header-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .pos-header-label{font-size:10px;letter-spacing:0.18em;color:var(--muted);}
+  .pos-header-date{margin-left:auto;font-size:10px;color:var(--dim);}
+
+  .pos-body{display:grid;grid-template-columns:1.1fr 0.5px 1fr 0.5px 1fr;gap:0;}
+  .pos-divider{background:var(--border);align-self:stretch;}
+
+  /* 主仓位列 */
+  .pos-main{padding:20px 24px 18px;display:flex;flex-direction:column;justify-content:center;}
+  .pos-main-level{font-size:10px;color:var(--muted);letter-spacing:0.14em;margin-bottom:8px;}
+  .pos-main-val{font-size:34px;font-weight:500;line-height:1;letter-spacing:-0.01em;margin-bottom:6px;transition:color .3s;}
+  .pos-main-pct{font-size:13px;margin-bottom:10px;}
+  .pos-main-reason{font-size:10px;color:var(--muted);line-height:1.6;max-width:340px;}
+  @keyframes blink-red{0%,100%{opacity:1}50%{opacity:0.4}}
+  .pos-main-val.blink{animation:blink-red 1s infinite;}
+
+  /* 港股科技列 */
+  .pos-hk{padding:20px 22px 18px;}
+  .pos-hk-title{font-size:10px;color:var(--muted);letter-spacing:0.12em;margin-bottom:8px;}
+  .pos-hk-val{font-size:18px;font-weight:500;margin-bottom:6px;transition:color .3s;}
+  .pos-hk-etf{font-size:11px;margin-bottom:10px;}
+  .pos-hk-basis{font-size:10px;color:var(--muted);line-height:1.6;}
+  .hk-spread-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;margin-right:4px;}
+
+  /* 灯号列 */
+  .pos-lights{padding:20px 22px 18px;}
+  .pos-lights-title{font-size:10px;color:var(--muted);letter-spacing:0.12em;margin-bottom:12px;}
+  .lights-row{display:flex;gap:6px;margin-bottom:8px;align-items:center;}
+  .lights-row-label{font-size:10px;color:var(--dim);width:68px;flex-shrink:0;}
+  .light{width:11px;height:11px;border-radius:50%;flex-shrink:0;opacity:0.3;}
+  .light.on-red   {background:var(--red);   opacity:1;box-shadow:0 0 6px var(--red);}
+  .light.on-amber {background:var(--amber); opacity:1;box-shadow:0 0 6px var(--amber);}
+  .light.on-green {background:var(--green); opacity:1;}
+  .light.on-na    {background:var(--dim);   opacity:0.5;}
+  .lights-count{display:flex;gap:10px;margin-top:10px;font-size:10px;}
+  .lc-item{display:flex;align-items:center;gap:4px;}
+  .lc-dot{width:7px;height:7px;border-radius:50%;}
+
+  /* ── alert bar ── */
   .alert-bar{display:flex;gap:8px;margin-bottom:20px;}
   .alert-badge{display:flex;align-items:center;gap:6px;background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:11px;}
   .alert-dot{width:8px;height:8px;border-radius:50%;}
@@ -56,34 +88,32 @@
   .dot-amber{background:var(--amber);}
   .dot-green{background:var(--green);}
 
-  /* section label */
+  /* ── section label ── */
   .section-label{font-size:10px;color:var(--dim);letter-spacing:0.14em;text-transform:uppercase;margin:20px 0 10px;padding-left:8px;border-left:2px solid var(--dim);}
 
-  /* indicator grid */
+  /* ── indicator grid ── */
   .ind-grid{display:grid;gap:10px;margin-bottom:4px;}
   .ind-grid-3{grid-template-columns:repeat(3,1fr);}
-  .ind-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color 0.2s;}
-  .ind-card.status-red{border-color:rgba(248,113,113,0.35);background:linear-gradient(135deg,var(--red-dim),var(--bg2));}
-  .ind-card.status-amber{border-color:rgba(251,191,36,0.35);background:linear-gradient(135deg,var(--amber-dim),var(--bg2));}
-  .ind-card.status-green{border-color:rgba(74,222,128,0.15);}
-  .ind-card.status-na{border-color:var(--border);}
+  .ind-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;overflow:hidden;transition:border-color .2s;}
+  .ind-card.status-red   {border-color:rgba(248,113,113,0.35);background:linear-gradient(135deg,var(--red-dim),var(--bg2));}
+  .ind-card.status-amber {border-color:rgba(251,191,36,0.35);background:linear-gradient(135deg,var(--amber-dim),var(--bg2));}
+  .ind-card.status-green {border-color:rgba(74,222,128,0.15);}
+  .ind-card.status-na    {border-color:var(--border);}
   .ind-name{font-size:10px;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
   .ind-val{font-size:20px;font-weight:500;line-height:1.1;margin-bottom:2px;}
   .ind-unit{font-size:10px;color:var(--muted);margin-bottom:8px;}
   .ind-meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px;}
   .ind-chg{font-size:11px;}
   .ind-status{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;}
-  .status-badge-red{background:rgba(248,113,113,0.15);color:var(--red);}
-  .status-badge-amber{background:rgba(251,191,36,0.15);color:var(--amber);}
-  .status-badge-green{background:rgba(74,222,128,0.12);color:var(--green);}
-  .status-badge-na{background:rgba(107,114,128,0.15);color:var(--muted);}
+  .status-badge-red   {background:rgba(248,113,113,0.15);color:var(--red);}
+  .status-badge-amber {background:rgba(251,191,36,0.15);color:var(--amber);}
+  .status-badge-green {background:rgba(74,222,128,0.12);color:var(--green);}
+  .status-badge-na    {background:rgba(107,114,128,0.15);color:var(--muted);}
   .sparkline-wrap{height:32px;margin:8px 0 4px;}
   .sparkline-wrap svg{width:100%;height:32px;}
-
-  /* threshold line */
   .threshold-info{font-size:10px;color:var(--dim);margin-top:4px;}
 
-  /* table */
+  /* ── table ── */
   .hist-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;}
   .hist-table th{color:var(--muted);font-weight:400;letter-spacing:0.08em;text-align:right;padding:6px 10px;border-bottom:0.5px solid var(--border);}
   .hist-table th:first-child{text-align:left;}
@@ -92,18 +122,16 @@
   .hist-table tr:last-child td{border-bottom:none;}
   .hist-table tr:hover td{background:rgba(255,255,255,0.02);}
 
-  /* footer */
+  /* ── footer ── */
   .footer{margin-top:32px;padding-top:16px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;font-size:10px;color:var(--dim);}
 
   @media(max-width:900px){
     .ind-grid-3{grid-template-columns:1fr 1fr;}
-    .signal-panel{grid-template-columns:1fr 1fr;}
-    .signal-reco{grid-column:auto;}
-    .signal-divider{display:none;}
+    .pos-body{grid-template-columns:1fr;grid-template-rows:auto}
+    .pos-divider{display:none;}
   }
   @media(max-width:600px){
     .ind-grid-3{grid-template-columns:1fr;}
-    .signal-panel{grid-template-columns:1fr;}
   }
 </style>
 </head>
@@ -123,36 +151,58 @@
     </div>
   </div>
 
-  <!-- Signal Panel -->
-  <div class="signal-panel" id="signal-panel">
-    <div class="signal-score">
-      <div class="score-val" id="sig-score" style="color:var(--green)">--</div>
-      <div class="score-label">综合预警分</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:4px" id="sig-level">--</div>
+  <!-- ══ 仓位信号面板 ══ -->
+  <div class="pos-panel" id="pos-panel">
+    <div class="pos-header">
+      <span class="pos-header-dot" id="pos-dot"></span>
+      <span class="pos-header-label">POSITION SIGNAL · 综合仓位信号</span>
+      <span class="pos-header-date" id="pos-date">--</span>
     </div>
-    <div class="signal-divider"></div>
-    <div class="signal-layer">
-      <div class="layer-title">L1 · 美元流动性</div>
-      <div class="layer-val" id="l1-val" style="color:var(--green)">--</div>
-      <div class="layer-sub" id="l1-sub">ON RRP / 储备金 / TGA</div>
+    <div class="pos-body">
+      <!-- 主仓位 -->
+      <div class="pos-main">
+        <div class="pos-main-level">A · 整体仓位</div>
+        <div class="pos-main-val" id="pos-val">--</div>
+        <div class="pos-main-pct" id="pos-pct" style="color:var(--muted)">--</div>
+        <div class="pos-main-reason" id="pos-reason">--</div>
+      </div>
+      <div class="pos-divider"></div>
+      <!-- 港股科技 -->
+      <div class="pos-hk">
+        <div class="pos-hk-title">B · 港股科技 ETF</div>
+        <div class="pos-hk-val" id="hk-val">--</div>
+        <div class="pos-hk-etf" id="hk-etf" style="color:var(--muted)">--</div>
+        <div class="pos-hk-basis" id="hk-basis">--</div>
+      </div>
+      <div class="pos-divider"></div>
+      <!-- 三层灯号 -->
+      <div class="pos-lights">
+        <div class="pos-lights-title">C · 三层预警灯</div>
+        <div class="lights-row">
+          <span class="lights-row-label">供给层</span>
+          <span class="light" id="lt-onrrp"></span>
+          <span class="light" id="lt-reserves"></span>
+          <span class="light" id="lt-tga"></span>
+        </div>
+        <div class="lights-row">
+          <span class="lights-row-label">价格层</span>
+          <span class="light" id="lt-sofr-iorb"></span>
+          <span class="light" id="lt-sofr-effr"></span>
+          <span class="light" id="lt-sofr-fut"></span>
+        </div>
+        <div class="lights-row">
+          <span class="lights-row-label">行为层</span>
+          <span class="light" id="lt-srf"></span>
+          <span class="light" id="lt-dw"></span>
+          <span class="light on-na" title="JPY basis 待接入"></span>
+        </div>
+        <div class="lights-count">
+          <span class="lc-item"><span class="lc-dot" style="background:var(--red)"></span><span id="cnt-red">0</span>&nbsp;警戒</span>
+          <span class="lc-item"><span class="lc-dot" style="background:var(--amber)"></span><span id="cnt-amber">0</span>&nbsp;预警</span>
+          <span class="lc-item"><span class="lc-dot" style="background:var(--green)"></span><span id="cnt-green">0</span>&nbsp;正常</span>
+        </div>
+      </div>
     </div>
-    <div class="signal-layer">
-      <div class="layer-title">L2 · HIBOR-SOFR 方向</div>
-      <div class="layer-val" id="l2-val" style="color:var(--muted)">--</div>
-      <div class="layer-sub" id="l2-sub">港元流动性 → ETF 套利空间</div>
-    </div>
-    <div class="signal-reco">
-      <div class="reco-label">综合建议</div>
-      <div class="reco-val" id="sig-reco">--</div>
-    </div>
-  </div>
-
-  <!-- Alert counts -->
-  <div class="alert-bar">
-    <div class="alert-badge"><span class="alert-dot dot-red"></span><span id="cnt-red">0</span> 警戒</div>
-    <div class="alert-badge"><span class="alert-dot dot-amber"></span><span id="cnt-amber">0</span> 预警</div>
-    <div class="alert-badge"><span class="alert-dot dot-green"></span><span id="cnt-green">0</span> 正常</div>
-    <div class="alert-badge" style="margin-left:auto;color:var(--muted)"><span id="cnt-na">0</span> 待接入</div>
   </div>
 
   <!-- Tier 1: Supply -->
@@ -234,14 +284,14 @@
   <!-- Tier 3: Behavior -->
   <div class="section-label">第三层 · 行为信号（BEHAVIOR）</div>
   <div class="ind-grid ind-grid-3">
-    <div class="ind-card" id="card-jpy">
+    <div class="ind-card status-na" id="card-jpy">
       <div class="ind-name">JPY 货币基差</div>
-      <div class="ind-val" id="val-jpy" style="color:var(--dim)">待接入</div>
+      <div class="ind-val" style="color:var(--dim)">待接入</div>
       <div class="ind-unit">基点 · USD/JPY Cross-currency basis</div>
       <div class="sparkline-wrap" id="spark-jpy"></div>
       <div class="ind-meta">
-        <span class="ind-chg" id="chg-jpy">--</span>
-        <span class="ind-status status-badge-na" id="badge-jpy">待接入</span>
+        <span class="ind-chg">--</span>
+        <span class="ind-status status-badge-na">待接入</span>
       </div>
       <div class="threshold-info">警戒 &lt;-50bp（套利平仓压力）</div>
     </div>
@@ -281,6 +331,7 @@
           <th>TGA变化(B)</th>
           <th>SOFR-IORB(bp)</th>
           <th>SOFR-EFFR(bp)</th>
+          <th>HIBOR-SOFR(bp)</th>
           <th>SRF(B)</th>
           <th>DW(B)</th>
         </tr>
@@ -291,12 +342,11 @@
 
   <!-- Footer -->
   <div class="footer">
-    <span>数据来源：FRED (St. Louis Fed) · Federal Reserve H.4.1</span>
+    <span>数据来源：FRED (St. Louis Fed) · Federal Reserve H.4.1 · 东方财富（HIBOR）</span>
     <span>每日 UTC 09:30 自动更新 · fetch_liquidity.py</span>
   </div>
 
 </div>
-
 <script>
 // ── 实时数据（fetch_liquidity.py 写入 2026-03-25）──
 const LIQ_DATES=["2026-03-25"];
@@ -310,43 +360,32 @@ const LIQ_EFFR=[3.64];
 const LIQ_SOFR90=[3.68594];
 const LIQ_SRF=[0.0];
 const LIQ_DW=[3.75];
+const LIQ_HIBOR_SPREAD=[-134.28];
 
-const LIQ_LATEST={"date": "2026-03-25", "onrrp": 1.123, "reserves": 3019.99, "tga": 853.05, "tga_wow": 14.87, "sofr": 3.62, "iorb": 3.65, "effr": 3.64, "sofr90": 3.68594, "dw": 3.75, "srf": 0.0, "sofr_iorb_bp": -3.0, "sofr_effr_bp": -2.0};
+const LIQ_LATEST={"date": "2026-03-25", "onrrp": 1.123, "reserves": 3019.99, "tga": 853.05, "tga_wow": 14.87, "sofr": 3.62, "iorb": 3.65, "effr": 3.64, "sofr90": 3.68594, "dw": 3.75, "srf": 0.0, "sofr_iorb_bp": -3.0, "sofr_effr_bp": -2.0, "hibor_spread_bp": -134.28};
 
 // ── 阈值配置 ──
 const THRESHOLDS = {
-  onrrp:       { red: 10,   amber: 50,   dir: 'lt' },
-  reserves:    { red: 2900, amber: 3100, dir: 'lt' },
-  tga_wow:     { red: 100,  amber: 60,   dir: 'gt' },
-  sofr_iorb:   { red: 15,   amber: 10,   dir: 'gt' },
-  sofr_effr:   { red: 10,   amber: 5,    dir: 'gt' },
-  sofr_futures:{ red: 96.40,amber: 96.70,dir: 'lt' },
-  srf:         { red: 30,   amber: 10,   dir: 'gt' },
-  dw:          { red: 5,    amber: 2,    dir: 'gt' },
+  onrrp:        { red:10,    amber:50,    dir:'lt' },
+  reserves:     { red:2900,  amber:3100,  dir:'lt' },
+  tga_wow:      { red:100,   amber:60,    dir:'gt' },
+  sofr_iorb:    { red:15,    amber:10,    dir:'gt' },
+  sofr_effr:    { red:10,    amber:5,     dir:'gt' },
+  sofr_futures: { red:96.40, amber:96.70, dir:'lt' },
+  srf:          { red:30,    amber:10,    dir:'gt' },
+  dw:           { red:5,     amber:2,     dir:'gt' },
 };
 
 function getStatus(val, key) {
   if (val === null || val === undefined || isNaN(val)) return 'na';
   const t = THRESHOLDS[key];
   if (!t) return 'na';
-  if (t.dir === 'lt') {
-    if (val < t.red) return 'red';
-    if (val < t.amber) return 'amber';
-    return 'green';
-  } else {
-    if (val > t.red) return 'red';
-    if (val > t.amber) return 'amber';
-    return 'green';
-  }
+  if (t.dir === 'lt') { return val < t.red ? 'red' : val < t.amber ? 'amber' : 'green'; }
+  else                { return val > t.red ? 'red' : val > t.amber ? 'amber' : 'green'; }
 }
 
 function statusBadge(status, label) {
-  const map = {
-    red:   { cls: 'status-badge-red',   txt: '警戒' },
-    amber: { cls: 'status-badge-amber', txt: '预警' },
-    green: { cls: 'status-badge-green', txt: '正常' },
-    na:    { cls: 'status-badge-na',    txt: label || '--' },
-  };
+  const map = { red:{cls:'status-badge-red',txt:'警戒'}, amber:{cls:'status-badge-amber',txt:'预警'}, green:{cls:'status-badge-green',txt:'正常'}, na:{cls:'status-badge-na',txt:label||'--'} };
   const s = map[status] || map.na;
   return `<span class="ind-status ${s.cls}">${s.txt}</span>`;
 }
@@ -357,210 +396,243 @@ function fmtNum(v, dec=2) {
 }
 
 function fmtChg(now, prev) {
-  if (prev === null || prev === undefined || now === null || now === undefined) return '';
+  if (prev == null || now == null) return '';
   const d = now - prev;
   const c = d > 0 ? 'var(--red)' : d < 0 ? 'var(--green)' : 'var(--muted)';
   return `<span style="color:${c}">${d > 0 ? '+' : ''}${d.toFixed(2)}</span>`;
 }
 
-// ── SVG Sparkline ──
-function drawSparkline(containerId, data, color='#2dd4bf', fillColor='rgba(45,212,191,0.08)') {
-  const el = document.getElementById(containerId);
-  if (!el || !data || data.length < 2) return;
-  const W = 240, H = 32, pad = 2;
-  const valid = data.filter(v => v !== null && !isNaN(v));
-  if (valid.length < 2) return;
-  const mn = Math.min(...valid), mx = Math.max(...valid);
-  const rng = mx - mn || 1;
-  const pts = data.map((v, i) => {
-    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
-    const y = (H - pad) - ((v - mn) / rng) * (H - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const ptArr = data.map((v, i) => ({
-    x: pad + (i / (data.length - 1)) * (W - pad * 2),
-    y: (H - pad) - ((v - mn) / rng) * (H - pad * 2)
-  }));
-  const polyPath = ptArr.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const fillPath = `${polyPath} L${ptArr[ptArr.length-1].x.toFixed(1)},${H} L${ptArr[0].x.toFixed(1)},${H} Z`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <path d="${fillPath}" fill="${fillColor}" stroke="none"/>
-    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>
-  </svg>`;
-}
-
-function sparkColor(status) {
-  return { red: '#f87171', amber: '#fbbf24', green: '#2dd4bf', na: '#3d4350' }[status] || '#3d4350';
-}
-function sparkFill(status) {
-  return { red: 'rgba(248,113,113,0.1)', amber: 'rgba(251,191,36,0.1)', green: 'rgba(45,212,191,0.08)', na: 'rgba(61,67,80,0.1)' }[status] || 'rgba(61,67,80,0.1)';
-}
-
-function setCard(id, status) {
-  const el = document.getElementById('card-' + id);
+function drawSparkline(id, data, color='#2dd4bf', fill='rgba(45,212,191,0.08)') {
+  const el = document.getElementById(id);
   if (!el) return;
-  el.className = `ind-card status-${status}`;
+  const valid = (data||[]).filter(v => v !== null && !isNaN(v));
+  if (valid.length < 2) return;
+  const W=240, H=32, pad=2;
+  const mn=Math.min(...valid), mx=Math.max(...valid), rng=mx-mn||1;
+  const pts = data.map((v,i) => {
+    const x = pad+(i/(data.length-1))*(W-pad*2);
+    const y = (H-pad)-((v-mn)/rng)*(H-pad*2);
+    return {x,y};
+  });
+  const line = pts.map((p,i) => `${i?'L':'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const fill_path = `${line} L${pts[pts.length-1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
+  const poly = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${fill_path}" fill="${fill}" stroke="none"/><polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+
+const SPARK_COLOR = { red:'#f87171', amber:'#fbbf24', green:'#2dd4bf', na:'#3d4350' };
+const SPARK_FILL  = { red:'rgba(248,113,113,0.1)', amber:'rgba(251,191,36,0.1)', green:'rgba(45,212,191,0.08)', na:'rgba(61,67,80,0.1)' };
+
+function setCard(id, st) {
+  const el = document.getElementById('card-'+id);
+  if (el) el.className = `ind-card status-${st}`;
+}
+
+function setLight(id, st) {
+  const el = document.getElementById('lt-'+id);
+  if (!el) return;
+  el.className = 'light on-' + (st==='red'?'red':st==='amber'?'amber':st==='green'?'green':'na');
+}
+
+// ── 仓位信号逻辑 ──
+function computePosition(st, hibor_spread_bp) {
+  const vals      = Object.values(st);
+  const redCnt    = vals.filter(s=>s==='red').length;
+  const amberCnt  = vals.filter(s=>s==='amber').length;
+
+  // 三级各有红 = 三级全红
+  const tier1Red  = [st.onrrp,st.reserves,st.tga].some(s=>s==='red');
+  const tier2Red  = [st.sofr_iorb,st.sofr_effr,st.sofr_futures].some(s=>s==='red');
+  const tier3Red  = [st.srf,st.dw].some(s=>s==='red');
+  const allRed    = tier1Red && tier2Red && tier3Red;
+
+  // ── 主仓位 ──
+  let posLabel, posPct, posColor, posReason, posBlink=false, posLevel;
+  if (allRed) {
+    posLabel='全力防守';    posPct='空仓 · 全面对冲';  posColor='#dc2626'; posBlink=true; posLevel='lvl-dred';
+    posReason='三层预警全部触发警戒 — 供给收缩+价格抬升+机构行为异常，流动性危机模式，清空风险资产并买入保护性资产。';
+  } else if (redCnt >= 2) {
+    posLabel='空仓·买保护'; posPct='0% 净多头';        posColor='var(--red)'; posLevel='lvl-red';
+    posReason='多项核心指标进入警戒 — 美元流动性压力显著，需清空权益仓位，买入尾部风险保护（VIX期权/做多美元）。';
+  } else if (redCnt >= 1 && amberCnt >= 1) {
+    posLabel='两成仓·对冲'; posPct='20% + 对冲层';     posColor='var(--orange)'; posLevel='lvl-orange';
+    posReason='红灯+预警同时出现 — 流动性拐点信号，维持极低敞口并建立对冲头寸（做空高估值/买防御性资产）。';
+  } else if (redCnt >= 1 || amberCnt >= 2) {
+    posLabel='半仓观望';    posPct='50% · 等待确认';   posColor='var(--amber)'; posLevel='lvl-amber';
+    posReason='流动性偏紧信号出现 — 降低仓位至半仓，等待指标回归正常区间后再加仓，避免追涨。';
+  } else if (amberCnt >= 1) {
+    posLabel='七成仓';      posPct='70% · 适度持有';   posColor='#86efac'; posLevel='lvl-lgreen';
+    posReason='有单项预警但整体尚宽松 — 维持偏多仓位，保留30%现金作为应急缓冲。';
+  } else {
+    posLabel='全力做多';    posPct='满仓 · 积极配置';  posColor='var(--green)'; posLevel='lvl-green';
+    posReason='全部指标绿灯 — 美元流动性充裕，市场承载力强，可积极做多风险资产。';
+  }
+
+  // ── 港股科技 ──
+  const usdSevere  = redCnt >= 2 || allRed;
+  const usdStress  = redCnt >= 1 || amberCnt >= 2;
+  const spreadNeg  = (hibor_spread_bp !== null) && hibor_spread_bp < -10;  // HIBOR < SOFR
+  const spreadWide = (hibor_spread_bp !== null) && hibor_spread_bp > -50;  // 利差收窄/走阔
+  const spreadStr  = hibor_spread_bp !== null ? `${hibor_spread_bp > 0 ? '+' : ''}${hibor_spread_bp.toFixed(1)}bp` : '--';
+  const spreadTag  = spreadNeg ? '港元宽松' : '利差收窄';
+  const spreadTagColor = spreadNeg ? 'rgba(74,222,128,0.15)' : 'rgba(251,191,36,0.15)';
+  const spreadTagText  = spreadNeg ? '#4ade80' : '#fbbf24';
+
+  let hkLabel, hkEtf, hkColor, hkBasis;
+  if (usdSevere) {
+    hkLabel='清仓 · 全面防守'; hkEtf='清出3033 / 转现金';       hkColor='var(--red)';
+    hkBasis=`美元全面压力 · 利差=${spreadStr} → ETF套利窗口关闭，清空港股科技仓位，转持现金或反向ETF。`;
+  } else if (usdStress && spreadWide) {
+    hkLabel='减仓 · 转守3110'; hkEtf='3033→20% / 3110→40%';   hkColor='var(--orange)';
+    hkBasis=`美元偏紧+利差收窄(${spreadStr}) → 套利空间压缩，减少3033仓位并转入更稳健的3110。`;
+  } else if (!usdStress && !spreadNeg) {
+    hkLabel='半仓3033';        hkEtf='3033→50% / 余量观望';     hkColor='var(--amber)';
+    hkBasis=`美元宽松但利差偏正(${spreadStr}) → 套利优势有限，半仓持有3033，等待利差深化。`;
+  } else {
+    // 美元宽松 + 利差负值
+    hkLabel='全力做多3033';    hkEtf='3033→满仓 / 适度杠杆';    hkColor='var(--green)';
+    hkBasis=`美元宽松 + HIBOR-SOFR利差深度负值(${spreadStr}) → 港元流动性充裕，ETF套利空间大，全力配置3033。`;
+  }
+
+  return { posLabel, posPct, posColor, posReason, posBlink, posLevel, hkLabel, hkEtf, hkColor, hkBasis, spreadStr, spreadTagColor, spreadTagText, spreadTag };
 }
 
 function updateDashboard() {
-  const n = LIQ_DATES.length;
-  const latest = LIQ_LATEST;
+  const n       = LIQ_DATES.length;
+  const latest  = LIQ_LATEST;
 
-  // Compute derived values
-  const sofr_iorb_bp = latest.sofr !== null && latest.iorb !== null
-    ? Math.round((latest.sofr - latest.iorb) * 100 * 10) / 10 : null;
-  const sofr_effr_bp = latest.sofr !== null && latest.effr !== null
-    ? Math.round((latest.sofr - latest.effr) * 100 * 10) / 10 : null;
-  const sofr_futures = latest.sofr90 !== null
-    ? Math.round((100 - latest.sofr90) * 1000) / 1000 : null;
-  const tga_wow = latest.tga_wow;
+  // 计算衍生值
+  const sofr_iorb_bp  = (latest.sofr!=null && latest.iorb!=null) ? Math.round((latest.sofr-latest.iorb)*1000)/10 : null;
+  const sofr_effr_bp  = (latest.sofr!=null && latest.effr!=null) ? Math.round((latest.sofr-latest.effr)*1000)/10 : null;
+  const sofr_futures  = latest.sofr90!=null ? Math.round((100-latest.sofr90)*10000)/10000 : null;
+  const tga_wow       = latest.tga_wow;
+  const hibor_spread  = latest.hibor_spread_bp !== undefined ? latest.hibor_spread_bp : (LIQ_HIBOR_SPREAD.length ? LIQ_HIBOR_SPREAD[LIQ_HIBOR_SPREAD.length-1] : null);
 
-  // Statuses
+  // 状态
   const st = {
-    onrrp:        getStatus(latest.onrrp, 'onrrp'),
-    reserves:     getStatus(latest.reserves, 'reserves'),
-    tga:          getStatus(tga_wow, 'tga_wow'),
-    sofr_iorb:    getStatus(sofr_iorb_bp, 'sofr_iorb'),
-    sofr_effr:    getStatus(sofr_effr_bp, 'sofr_effr'),
-    sofr_futures: getStatus(sofr_futures, 'sofr_futures'),
-    srf:          getStatus(latest.srf, 'srf'),
-    dw:           getStatus(latest.dw, 'dw'),
+    onrrp:        getStatus(latest.onrrp,  'onrrp'),
+    reserves:     getStatus(latest.reserves,'reserves'),
+    tga:          getStatus(tga_wow,        'tga_wow'),
+    sofr_iorb:    getStatus(sofr_iorb_bp,   'sofr_iorb'),
+    sofr_effr:    getStatus(sofr_effr_bp,   'sofr_effr'),
+    sofr_futures: getStatus(sofr_futures,   'sofr_futures'),
+    srf:          getStatus(latest.srf,     'srf'),
+    dw:           getStatus(latest.dw,      'dw'),
   };
 
-  // Update date
+  // ── 仓位信号面板 ──
+  const sig = computePosition(st, hibor_spread);
+  const panel = document.getElementById('pos-panel');
+  panel.className = `pos-panel ${sig.posLevel}`;
+
+  const dotEl = document.getElementById('pos-dot');
+  const dotColors = { 'lvl-green':'#4ade80','lvl-lgreen':'#86efac','lvl-amber':'#fbbf24','lvl-orange':'#fb923c','lvl-red':'#f87171','lvl-dred':'#dc2626' };
+  dotEl.style.background = dotColors[sig.posLevel] || '#3d4350';
+
+  document.getElementById('pos-date').textContent = `${latest.date} · 更新`;
+
+  const posValEl = document.getElementById('pos-val');
+  posValEl.textContent = sig.posLabel;
+  posValEl.style.color = sig.posColor;
+  posValEl.className   = sig.posBlink ? 'pos-main-val blink' : 'pos-main-val';
+
+  document.getElementById('pos-pct').textContent    = sig.posPct;
+  document.getElementById('pos-pct').style.color    = sig.posColor;
+  document.getElementById('pos-reason').textContent = sig.posReason;
+
+  document.getElementById('hk-val').textContent   = sig.hkLabel;
+  document.getElementById('hk-val').style.color   = sig.hkColor;
+  document.getElementById('hk-etf').textContent   = sig.hkEtf;
+  document.getElementById('hk-etf').style.color   = sig.hkColor;
+  document.getElementById('hk-basis').innerHTML   =
+    `<span class="hk-spread-tag" style="background:${sig.spreadTagColor};color:${sig.spreadTagText}">${sig.spreadTag} ${sig.spreadStr}</span>${sig.hkBasis}`;
+
+  // 灯号
+  setLight('onrrp',    st.onrrp);
+  setLight('reserves', st.reserves);
+  setLight('tga',      st.tga);
+  setLight('sofr-iorb',st.sofr_iorb);
+  setLight('sofr-effr',st.sofr_effr);
+  setLight('sofr-fut', st.sofr_futures);
+  setLight('srf',      st.srf);
+  setLight('dw',       st.dw);
+
+  // 计数
+  const statList = Object.values(st);
+  document.getElementById('cnt-red').textContent   = statList.filter(s=>s==='red').length;
+  document.getElementById('cnt-amber').textContent = statList.filter(s=>s==='amber').length;
+  document.getElementById('cnt-green').textContent = statList.filter(s=>s==='green').length;
+
   document.getElementById('update-time').textContent = `更新 ${latest.date}`;
 
-  // Update cards - Tier 1
-  const prev_onrrp = n >= 2 ? LIQ_ONRRP[n-2] : null;
-  const prev_res   = n >= 2 ? LIQ_RESERVES[n-2] : null;
-  const prev_tga   = n >= 2 ? LIQ_TGA_WOW[n-2] : null;
+  // ── 各指标卡片 ──
+  const prev = idx => n>=2 ? idx[n-2] : null;
 
-  document.getElementById('val-onrrp').textContent    = fmtNum(latest.onrrp, 1);
-  document.getElementById('chg-onrrp').innerHTML      = fmtChg(latest.onrrp, prev_onrrp);
-  document.getElementById('badge-onrrp').outerHTML    = statusBadge(st.onrrp);
-  setCard('onrrp', st.onrrp);
-  drawSparkline('spark-onrrp', LIQ_ONRRP, sparkColor(st.onrrp), sparkFill(st.onrrp));
+  document.getElementById('val-onrrp').textContent   = fmtNum(latest.onrrp,1);
+  document.getElementById('chg-onrrp').innerHTML     = fmtChg(latest.onrrp, prev(LIQ_ONRRP));
+  document.getElementById('badge-onrrp').outerHTML   = statusBadge(st.onrrp);
+  setCard('onrrp',st.onrrp);
+  drawSparkline('spark-onrrp', LIQ_ONRRP, SPARK_COLOR[st.onrrp], SPARK_FILL[st.onrrp]);
 
-  document.getElementById('val-reserves').textContent  = fmtNum(latest.reserves, 0);
-  document.getElementById('chg-reserves').innerHTML    = fmtChg(latest.reserves, prev_res);
+  document.getElementById('val-reserves').textContent  = fmtNum(latest.reserves,0);
+  document.getElementById('chg-reserves').innerHTML    = fmtChg(latest.reserves, prev(LIQ_RESERVES));
   document.getElementById('badge-reserves').outerHTML  = statusBadge(st.reserves);
-  setCard('reserves', st.reserves);
-  drawSparkline('spark-reserves', LIQ_RESERVES, sparkColor(st.reserves), sparkFill(st.reserves));
+  setCard('reserves',st.reserves);
+  drawSparkline('spark-reserves', LIQ_RESERVES, SPARK_COLOR[st.reserves], SPARK_FILL[st.reserves]);
 
-  document.getElementById('val-tga').textContent      = (tga_wow !== null && !isNaN(tga_wow)) ? (tga_wow >= 0 ? '+' : '') + fmtNum(tga_wow, 1) : '--';
-  document.getElementById('chg-tga').innerHTML        = fmtChg(tga_wow, prev_tga);
-  document.getElementById('badge-tga').outerHTML      = statusBadge(st.tga);
-  setCard('tga', st.tga);
-  drawSparkline('spark-tga', LIQ_TGA_WOW, sparkColor(st.tga), sparkFill(st.tga));
+  const tgaStr = tga_wow!=null ? (tga_wow>=0?'+':'')+fmtNum(tga_wow,1) : '--';
+  document.getElementById('val-tga').textContent     = tgaStr;
+  document.getElementById('chg-tga').innerHTML       = fmtChg(tga_wow, prev(LIQ_TGA_WOW));
+  document.getElementById('badge-tga').outerHTML     = statusBadge(st.tga);
+  setCard('tga',st.tga);
+  drawSparkline('spark-tga', LIQ_TGA_WOW, SPARK_COLOR[st.tga], SPARK_FILL[st.tga]);
 
-  // Tier 2
-  const s_iorb_arr = LIQ_SOFR.map((v,i) => (v !== null && LIQ_IORB[i] !== null) ? Math.round((v - LIQ_IORB[i]) * 1000) / 10 : null);
-  const s_effr_arr = LIQ_SOFR.map((v,i) => (v !== null && LIQ_EFFR[i] !== null) ? Math.round((v - LIQ_EFFR[i]) * 1000) / 10 : null);
-  const s_fut_arr  = LIQ_SOFR90.map(v => v !== null ? Math.round((100 - v) * 1000) / 1000 : null);
+  // Tier 2 衍生数组
+  const si_arr  = LIQ_SOFR.map((v,i) => (v!=null&&LIQ_IORB[i]!=null) ? Math.round((v-LIQ_IORB[i])*1000)/10 : null);
+  const se_arr  = LIQ_SOFR.map((v,i) => (v!=null&&LIQ_EFFR[i]!=null) ? Math.round((v-LIQ_EFFR[i])*1000)/10 : null);
+  const sf_arr  = LIQ_SOFR90.map(v   => v!=null ? Math.round((100-v)*10000)/10000 : null);
 
-  const prev_si = n >= 2 ? s_iorb_arr[n-2] : null;
-  const prev_se = n >= 2 ? s_effr_arr[n-2] : null;
-  const prev_sf = n >= 2 ? s_fut_arr[n-2]  : null;
+  document.getElementById('val-sofr-iorb').textContent  = sofr_iorb_bp!=null ? (sofr_iorb_bp>0?'+':'')+fmtNum(sofr_iorb_bp,1) : '--';
+  document.getElementById('chg-sofr-iorb').innerHTML    = fmtChg(sofr_iorb_bp, n>=2?si_arr[n-2]:null);
+  document.getElementById('badge-sofr-iorb').outerHTML  = statusBadge(st.sofr_iorb);
+  setCard('sofr-iorb',st.sofr_iorb);
+  drawSparkline('spark-sofr-iorb', si_arr, SPARK_COLOR[st.sofr_iorb], SPARK_FILL[st.sofr_iorb]);
 
-  document.getElementById('val-sofr-iorb').textContent   = sofr_iorb_bp !== null ? (sofr_iorb_bp > 0 ? '+' : '') + fmtNum(sofr_iorb_bp, 1) : '--';
-  document.getElementById('chg-sofr-iorb').innerHTML     = fmtChg(sofr_iorb_bp, prev_si);
-  document.getElementById('badge-sofr-iorb').outerHTML   = statusBadge(st.sofr_iorb);
-  setCard('sofr-iorb', st.sofr_iorb);
-  drawSparkline('spark-sofr-iorb', s_iorb_arr, sparkColor(st.sofr_iorb), sparkFill(st.sofr_iorb));
+  document.getElementById('val-sofr-effr').textContent  = sofr_effr_bp!=null ? (sofr_effr_bp>0?'+':'')+fmtNum(sofr_effr_bp,1) : '--';
+  document.getElementById('chg-sofr-effr').innerHTML    = fmtChg(sofr_effr_bp, n>=2?se_arr[n-2]:null);
+  document.getElementById('badge-sofr-effr').outerHTML  = statusBadge(st.sofr_effr);
+  setCard('sofr-effr',st.sofr_effr);
+  drawSparkline('spark-sofr-effr', se_arr, SPARK_COLOR[st.sofr_effr], SPARK_FILL[st.sofr_effr]);
 
-  document.getElementById('val-sofr-effr').textContent   = sofr_effr_bp !== null ? (sofr_effr_bp > 0 ? '+' : '') + fmtNum(sofr_effr_bp, 1) : '--';
-  document.getElementById('chg-sofr-effr').innerHTML     = fmtChg(sofr_effr_bp, prev_se);
-  document.getElementById('badge-sofr-effr').outerHTML   = statusBadge(st.sofr_effr);
-  setCard('sofr-effr', st.sofr_effr);
-  drawSparkline('spark-sofr-effr', s_effr_arr, sparkColor(st.sofr_effr), sparkFill(st.sofr_effr));
-
-  document.getElementById('val-sofr-futures').textContent = sofr_futures !== null ? fmtNum(sofr_futures, 3) : '--';
-  document.getElementById('chg-sofr-futures').innerHTML   = fmtChg(sofr_futures, prev_sf);
+  document.getElementById('val-sofr-futures').textContent = sofr_futures!=null ? fmtNum(sofr_futures,3) : '--';
+  document.getElementById('chg-sofr-futures').innerHTML   = fmtChg(sofr_futures, n>=2?sf_arr[n-2]:null);
   document.getElementById('badge-sofr-futures').outerHTML = statusBadge(st.sofr_futures);
-  setCard('sofr-futures', st.sofr_futures);
-  drawSparkline('spark-sofr-futures', s_fut_arr, sparkColor(st.sofr_futures), sparkFill(st.sofr_futures));
+  setCard('sofr-futures',st.sofr_futures);
+  drawSparkline('spark-sofr-futures', sf_arr, SPARK_COLOR[st.sofr_futures], SPARK_FILL[st.sofr_futures]);
 
-  // Tier 3
-  const prev_srf = n >= 2 ? LIQ_SRF[n-2] : null;
-  const prev_dw  = n >= 2 ? LIQ_DW[n-2]  : null;
+  document.getElementById('val-srf').textContent     = fmtNum(latest.srf,1);
+  document.getElementById('chg-srf').innerHTML       = fmtChg(latest.srf, prev(LIQ_SRF));
+  document.getElementById('badge-srf').outerHTML     = statusBadge(st.srf);
+  setCard('srf',st.srf);
+  drawSparkline('spark-srf', LIQ_SRF, SPARK_COLOR[st.srf], SPARK_FILL[st.srf]);
 
-  document.getElementById('val-srf').textContent       = fmtNum(latest.srf, 1);
-  document.getElementById('chg-srf').innerHTML         = fmtChg(latest.srf, prev_srf);
-  document.getElementById('badge-srf').outerHTML       = statusBadge(st.srf);
-  setCard('srf', st.srf);
-  drawSparkline('spark-srf', LIQ_SRF, sparkColor(st.srf), sparkFill(st.srf));
+  document.getElementById('val-dw').textContent      = fmtNum(latest.dw,1);
+  document.getElementById('chg-dw').innerHTML        = fmtChg(latest.dw, prev(LIQ_DW));
+  document.getElementById('badge-dw').outerHTML      = statusBadge(st.dw);
+  setCard('dw',st.dw);
+  drawSparkline('spark-dw', LIQ_DW, SPARK_COLOR[st.dw], SPARK_FILL[st.dw]);
 
-  document.getElementById('val-dw').textContent        = fmtNum(latest.dw, 1);
-  document.getElementById('chg-dw').innerHTML          = fmtChg(latest.dw, prev_dw);
-  document.getElementById('badge-dw').outerHTML        = statusBadge(st.dw);
-  setCard('dw', st.dw);
-  drawSparkline('spark-dw', LIQ_DW, sparkColor(st.dw), sparkFill(st.dw));
-
-  // Alert counts
-  const statList = Object.values(st);
-  document.getElementById('cnt-red').textContent   = statList.filter(s => s === 'red').length;
-  document.getElementById('cnt-amber').textContent = statList.filter(s => s === 'amber').length;
-  document.getElementById('cnt-green').textContent = statList.filter(s => s === 'green').length;
-  document.getElementById('cnt-na').textContent    = statList.filter(s => s === 'na').length + 1; // +1 for JPY
-
-  // Signal panel
-  const scoreable = statList.filter(s => s !== 'na');
-  const score = scoreable.reduce((acc, s) => acc + (s === 'red' ? 3 : s === 'amber' ? 1 : 0), 0);
-  const maxScore = scoreable.length * 3;
-  const pct = maxScore > 0 ? Math.round(score / maxScore * 100) : 0;
-  const scoreEl = document.getElementById('sig-score');
-  const levelEl = document.getElementById('sig-level');
-  scoreEl.textContent = pct;
-  if (pct >= 60) {
-    scoreEl.style.color = 'var(--red)';
-    levelEl.textContent = '高度紧张';
-  } else if (pct >= 30) {
-    scoreEl.style.color = 'var(--amber)';
-    levelEl.textContent = '轻度偏紧';
-  } else {
-    scoreEl.style.color = 'var(--green)';
-    levelEl.textContent = '流动性充裕';
-  }
-
-  // L1 signal
-  const l1Status = [st.onrrp, st.reserves, st.tga];
-  const l1Red = l1Status.filter(s => s === 'red').length;
-  const l1Amber = l1Status.filter(s => s === 'amber').length;
-  const l1El = document.getElementById('l1-val');
-  if (l1Red >= 2) { l1El.textContent = '供给紧张'; l1El.style.color = 'var(--red)'; }
-  else if (l1Red >= 1 || l1Amber >= 2) { l1El.textContent = '供给偏紧'; l1El.style.color = 'var(--amber)'; }
-  else { l1El.textContent = '供给充裕'; l1El.style.color = 'var(--green)'; }
-
-  // L2 signal (HIBOR-SOFR spread from index page data - placeholder here)
-  const l2El = document.getElementById('l2-val');
-  l2El.textContent = '→ 参见HIBOR页';
-  l2El.style.color = 'var(--muted)';
-
-  // Reco
-  const recoEl = document.getElementById('sig-reco');
-  if (pct >= 60) {
-    recoEl.textContent = '谨慎减仓 · 规避风险资产';
-    recoEl.style.color = 'var(--red)';
-  } else if (pct >= 30) {
-    recoEl.textContent = '关注动向 · 控制仓位';
-    recoEl.style.color = 'var(--amber)';
-  } else {
-    recoEl.textContent = '流动性支持风险资产';
-    recoEl.style.color = 'var(--green)';
-  }
-
-  // History table
+  // ── 历史表格 ──
   const tbody = document.getElementById('hist-tbody');
   tbody.innerHTML = '';
-  const showN = Math.min(LIQ_DATES.length, 15);
-  for (let i = LIQ_DATES.length - 1; i >= LIQ_DATES.length - showN; i--) {
-    if (i < 0) break;
-    const si = LIQ_SOFR[i] !== null && LIQ_IORB[i] !== null
-      ? ((LIQ_SOFR[i] - LIQ_IORB[i]) * 100).toFixed(1) : '--';
-    const se = LIQ_SOFR[i] !== null && LIQ_EFFR[i] !== null
-      ? ((LIQ_SOFR[i] - LIQ_EFFR[i]) * 100).toFixed(1) : '--';
+  const showN = Math.min(n, 15);
+  for (let i=n-1; i>=n-showN; i--) {
+    if (i<0) break;
+    const si = LIQ_SOFR[i]!=null&&LIQ_IORB[i]!=null ? ((LIQ_SOFR[i]-LIQ_IORB[i])*100).toFixed(1) : '--';
+    const se = LIQ_SOFR[i]!=null&&LIQ_EFFR[i]!=null ? ((LIQ_SOFR[i]-LIQ_EFFR[i])*100).toFixed(1) : '--';
+    const hs = LIQ_HIBOR_SPREAD[i]!=null ? Number(LIQ_HIBOR_SPREAD[i]).toFixed(1) : '--';
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${LIQ_DATES[i]}</td><td>${LIQ_ONRRP[i] !== null ? Number(LIQ_ONRRP[i]).toFixed(1) : '--'}</td><td>${LIQ_RESERVES[i] !== null ? Number(LIQ_RESERVES[i]).toFixed(0) : '--'}</td><td>${LIQ_TGA_WOW[i] !== null ? (LIQ_TGA_WOW[i]>=0?'+':'')+Number(LIQ_TGA_WOW[i]).toFixed(1) : '--'}</td><td>${si}</td><td>${se}</td><td>${LIQ_SRF[i] !== null ? Number(LIQ_SRF[i]).toFixed(1) : '--'}</td><td>${LIQ_DW[i] !== null ? Number(LIQ_DW[i]).toFixed(1) : '--'}</td>`;
+    tr.innerHTML = `<td>${LIQ_DATES[i]}</td><td>${LIQ_ONRRP[i]!=null?Number(LIQ_ONRRP[i]).toFixed(1):'--'}</td><td>${LIQ_RESERVES[i]!=null?Number(LIQ_RESERVES[i]).toFixed(0):'--'}</td><td>${LIQ_TGA_WOW[i]!=null?(LIQ_TGA_WOW[i]>=0?'+':'')+Number(LIQ_TGA_WOW[i]).toFixed(1):'--'}</td><td>${si}</td><td>${se}</td><td>${hs}</td><td>${LIQ_SRF[i]!=null?Number(LIQ_SRF[i]).toFixed(1):'--'}</td><td>${LIQ_DW[i]!=null?Number(LIQ_DW[i]).toFixed(1):'--'}</td>`;
     tbody.appendChild(tr);
   }
 }
