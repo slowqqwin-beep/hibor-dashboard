@@ -278,26 +278,15 @@ function genDates(n){
   for(let i=n-1;i>=0;i--){const dd=new Date(d);dd.setDate(d.getDate()-i);arr.push(dd.toISOString().slice(0,10));}
   return arr;
 }
-const DATES=genDates(60);
-
-// ── 内置演示数据 ──
-const HIBOR=DATES.map((_,i)=>+(5.15-i*0.008+Math.sin(i*0.4)*0.06+(Math.random()-0.5)*0.04).toFixed(4));
-const SOFR =DATES.map((_,i)=>+(5.32-i*0.007+Math.sin(i*0.35)*0.04+(Math.random()-0.5)*0.03).toFixed(4));
-const SPREAD=HIBOR.map((h,i)=>+((h-SOFR[i])*100).toFixed(2));
-const SOUTH =SPREAD.map((s,i)=>+(-s*1.8+30+Math.sin(i*0.5)*15+(Math.random()-0.5)*20).toFixed(1));
-
-// 3033 恒生科技：从8.2附近随宽松环境缓步回升，有弹性
-const ETF3033=DATES.map((_,i)=>{
-  const base=8.2+i*0.018+Math.sin(i*0.45)*0.25+(Math.random()-0.5)*0.12;
-  return +Math.max(7.5,base).toFixed(3);
-});
-// 3110 恒生高股息：相对稳定，波动小，缓慢上行
-const ETF3110=DATES.map((_,i)=>{
-  const base=7.6+i*0.009+Math.sin(i*0.3)*0.12+(Math.random()-0.5)*0.07;
-  return +Math.max(7.2,base).toFixed(3);
-});
-// 比值
-const RATIO=ETF3033.map((v,i)=>+(v/ETF3110[i]).toFixed(4));
+// ── 实时数据（fetch_data.py 写入 2026-03-25）──
+const DATES=["2026-03-25"];
+const HIBOR=[2.3431];
+const SOFR =[0.0];
+const SPREAD=[234.31];
+const SOUTH =[-273.61];
+const ETF3033=[4.778];
+const ETF3110=[32.38];
+const RATIO=[0.1476];
 
 let data={dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],etf3110:[...ETF3110],ratio:[...RATIO]};
 
