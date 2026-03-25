@@ -15,7 +15,7 @@ backfill.py — 补录 2026-01-01 至今的历史数据
 依赖：pip install requests akshare yfinance
 """
 
-import os, sys, json, re, time, requests
+import os, sys, json, re, requests
 import yfinance as yf
 import akshare as ak
 from datetime import date, timedelta
@@ -42,43 +42,34 @@ def daterange(start: date, end: date):
 
 
 # ────────────────────────────────────────────────────────────────────
-# ① HIBOR 历史  (hkab.org.hk 逐日)
+# ① HIBOR 历史  (东方财富 API，一次拉全段)
+#   注：hkab.org.hk 旧 listRates.do 接口已废弃（301 自身循环）
 # ────────────────────────────────────────────────────────────────────
 def fetch_hibor_all() -> dict:
     """返回 {date_str: rate} dict，交易日有值，非交易日无键。"""
-    print("① 抓取 HIBOR 历史...")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
-        "Referer": "https://www.hkab.org.hk/",
+    print("① 抓取 HIBOR 历史（东方财富 API）...")
+    url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+    params = {
+        "reportName": "RPT_IMP_INTRESTRATEN",
+        "columns":    "REPORT_DATE,IR_RATE",
+        "filter":     '(MARKET_CODE="005")(CURRENCY_CODE="HKD")(INDICATOR_ID="203")',
+        "sortColumns": "REPORT_DATE",
+        "sortTypes":  "-1",
+        "pageSize":   "500",        # 远超所需，确保一次拿全
+        "pageNumber": "1",
+        "source":     "WEB",
+        "client":     "WEB",
     }
+    r = requests.get(url, params=params, timeout=20)
+    r.raise_for_status()
+    rows = r.json()["result"]["data"]
+    start_str = START_DATE.isoformat()
     result = {}
-    for d in daterange(START_DATE, TODAY):
-        if d.weekday() >= 5:        # 跳过周末
-            continue
-        url = (
-            f"https://www.hkab.org.hk/hibor/listRates.do"
-            f"?lang=en&Submit=Search&year={d.year}&month={d.month}&day={d.day}"
-        )
-        try:
-            r = requests.get(url, headers=headers, timeout=15)
-            r.raise_for_status()
-            # 在 HTML 中找 "3 Months" 行后的数值
-            # 页面结构：<td ...>3 Months</td><td ...>4.82000</td>...
-            import re as _re
-            m = _re.search(
-                r'3\s*Months.*?<td[^>]*>([\d.]+)</td>',
-                r.text, _re.S | _re.I
-            )
-            if m:
-                val = float(m.group(1))
-                result[str(d)] = val
-                print(f"   {d}  HIBOR 3M = {val:.4f}%")
-            else:
-                print(f"   {d}  HIBOR — 无数据（可能非交易日）")
-        except Exception as e:
-            print(f"   {d}  HIBOR ERROR: {e}")
-        time.sleep(0.3)             # 礼貌性延迟，避免被封
+    for row in rows:
+        ds = row["REPORT_DATE"][:10]
+        if ds >= start_str:
+            result[ds] = float(row["IR_RATE"])
+    print(f"   获取 {len(result)} 条 HIBOR 记录（{start_str} 至今）")
     return result
 
 
@@ -120,16 +111,26 @@ def fetch_etf_all() -> dict:
     print("\n③ 抓取 ETF 历史 (yfinance)...")
     result = {}
     for ticker, key in [("3033.HK", "3033"), ("3110.HK", "3110")]:
-        hist = yf.Ticker(ticker).history(
-            start=START_DATE.isoformat(),
-            end=(TODAY + timedelta(days=1)).isoformat()
-        )
+        last_err = None
+        for attempt in range(3):
+            try:
+                hist = yf.Ticker(ticker).history(period="6mo")
+                break
+            except Exception as e:
+                last_err = e
+                import time; time.sleep(2)
+        else:
+            raise RuntimeError(f"{ticker} 抓取失败（3次重试）: {last_err}")
+        start_str = START_DATE.isoformat()
         for dt, row in hist.iterrows():
             ds = str(dt.date())
+            if ds < start_str:
+                continue
             if ds not in result:
                 result[ds] = {}
             result[ds][key] = round(float(row["Close"]), 4)
-        print(f"   {ticker}: {len(hist)} 条")
+        count = sum(1 for v in result.values() if key in v)
+        print(f"   {ticker}: {count} 条")
     return result
 
 
@@ -198,9 +199,10 @@ def build_and_save(hibor_map, sofr_map, etf_map, south_map) -> list:
 
         spread_str = f"{spread_bp:+.1f}bp" if spread_bp is not None else "N/A"
         south_str  = f"{south:+.1f}" if south is not None else "N/A"
+        sofr_disp = f"{sofr:.3f}%" if sofr is not None else "N/A"
         print(
-            f"  {ds}  HIBOR={hibor:.3f}%  SOFR={sofr:.3f}% "
-            f" 利差={spread_str}  3033={e3033:.3f}  3110={e3110:.3f}"
+            f"  {ds}  HIBOR={hibor:.3f}%  SOFR={sofr_disp}"
+            f"  利差={spread_str}  3033={e3033:.3f}  3110={e3110:.3f}"
             f"  南向={south_str}亿"
         )
 
