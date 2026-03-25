@@ -96,18 +96,6 @@
   .data-table tr:hover td{background:rgba(255,255,255,0.02);}
   .pos{color:var(--green);} .neg{color:var(--red);} .neu{color:var(--amber);}
 
-  /* update panel */
-  .update-panel{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:16px 18px;margin-top:10px;}
-  .update-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
-  .update-grid-2{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;align-items:end;}
-  .inp-group label{font-size:10px;color:var(--muted);letter-spacing:0.08em;display:block;margin-bottom:4px;}
-  .inp-group input{width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:6px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;padding:7px 10px;outline:none;transition:border-color .2s;}
-  .inp-group input:focus{border-color:var(--teal);}
-  .inp-group input.eth{border-color:rgba(160,130,250,0.3);}
-  .inp-group input.eth:focus{border-color:var(--purple);}
-  .btn{background:var(--teal);color:#0a0c0f;border:none;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;padding:8px 16px;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
-  .btn:hover{opacity:0.85;}
-  .inp-divider{font-size:10px;color:var(--dim);letter-spacing:0.1em;margin:10px 0 8px;padding-top:10px;border-top:0.5px solid var(--border);}
 
   /* interp */
   .interp{background:var(--bg3);border-left:2px solid var(--teal);border-radius:0 6px 6px 0;padding:10px 13px;font-size:11px;color:var(--muted);line-height:1.75;margin-top:12px;}
@@ -245,25 +233,6 @@
     <div class="interp" id="interp">正在生成解读...</div>
   </div>
 
-  <!-- Update Panel -->
-  <div class="update-panel">
-    <div class="card-title" style="margin-bottom:10px;">手动更新今日数据</div>
-    <div class="update-grid">
-      <div class="inp-group"><label>HIBOR 3M (%)</label><input type="number" id="inp-hibor" placeholder="e.g. 4.82" step="0.01"></div>
-      <div class="inp-group"><label>Term SOFR 3M (%)</label><input type="number" id="inp-sofr" placeholder="e.g. 5.31" step="0.01"></div>
-      <div class="inp-group"><label>南向资金净流入（亿港元）</label><input type="number" id="inp-south" placeholder="e.g. 52.3" step="0.1"></div>
-    </div>
-    <div class="inp-divider">ETF 收盘价</div>
-    <div class="update-grid-2">
-      <div class="inp-group"><label>3033 恒生科技 ETF（港元）</label><input class="eth" type="number" id="inp-3033" placeholder="e.g. 9.42" step="0.01"></div>
-      <div class="inp-group"><label>3110 恒生高股息 ETF（港元）</label><input class="eth" type="number" id="inp-3110" placeholder="e.g. 7.85" step="0.01"></div>
-      <div class="inp-group"><label>&nbsp;</label></div>
-      <button class="btn" onclick="addTodayData()">更新 →</button>
-    </div>
-    <div style="margin-top:10px;font-size:10px;color:var(--dim);line-height:1.8;">
-      HIBOR → hkab.org.hk &nbsp;|&nbsp; Term SOFR → cmegroup.com &nbsp;|&nbsp; 南向 → hkex.com.hk/Mutual-Market &nbsp;|&nbsp; 3033/3110 → 港交所或券商行情
-    </div>
-  </div>
 
   <div class="footer">
     <span>仅供研究参考，不构成投资建议</span>
@@ -504,39 +473,6 @@ function updateInterp(){
   document.getElementById('interp').innerHTML=t;
 }
 
-// ── 手动更新 ──
-function addTodayData(){
-  const h=parseFloat(document.getElementById('inp-hibor').value);
-  const s=parseFloat(document.getElementById('inp-sofr').value);
-  const so=parseFloat(document.getElementById('inp-south').value);
-  const p3=parseFloat(document.getElementById('inp-3033').value);
-  const p1=parseFloat(document.getElementById('inp-3110').value);
-  if([h,s,so,p3,p1].some(isNaN)){alert('请填写全部五个数值');return;}
-  const sp=+((h-s)*100).toFixed(2);
-  const r=+(p3/p1).toFixed(4);
-  const today=new Date().toISOString().slice(0,10);
-
-  data.dates.push(today);data.hibor.push(h);data.sofr.push(s);
-  data.spread.push(sp);data.south.push(so);
-  data.etf3033.push(p3);data.etf3110.push(p1);data.ratio.push(r);
-
-  // 图表追加
-  [chartRates,chartSpread,chartETF,chartRatio,chartOverlay].forEach(c=>{c.data.labels.push(today);});
-  chartRates.data.datasets[0].data.push(h);
-  chartRates.data.datasets[1].data.push(s);
-  chartSpread.data.datasets[0].data.push(sp);
-  chartSpread.data.datasets[0].backgroundColor.push(sp<-10?'rgba(74,222,128,0.7)':sp>10?'rgba(248,113,113,0.7)':'rgba(45,212,191,0.7)');
-  chartETF.data.datasets[0].data.push(p3);
-  chartETF.data.datasets[1].data.push(p1);
-  chartRatio.data.datasets[0].data.push(r);
-  chartOverlay.data.datasets[0].data.push(sp);
-  chartOverlay.data.datasets[1].data.push(r);
-  chartOverlay.data.datasets[2].data.push(so);
-  [chartRates,chartSpread,chartETF,chartRatio,chartOverlay].forEach(c=>c.update());
-
-  updateKPI();updateTable();updateInterp();
-  ['inp-hibor','inp-sofr','inp-south','inp-3033','inp-3110'].forEach(id=>{document.getElementById(id).value='';});
-}
 
 // ── Init ──
 initCharts();updateKPI();updateTable();updateInterp();
