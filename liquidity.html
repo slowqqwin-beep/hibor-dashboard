@@ -348,22 +348,22 @@
 
 </div>
 <script>
-// ── 实时数据（fetch_liquidity.py 写入 2026-03-25）──
-const LIQ_DATES=["2026-03-25"];
-const LIQ_ONRRP=[1.123];
-const LIQ_RESERVES=[3019.995];
-const LIQ_TGA=[853.052];
-const LIQ_TGA_WOW=[14.866];
-const LIQ_SOFR=[3.63];
-const LIQ_IORB=[3.65];
-const LIQ_EFFR=[3.64];
-const LIQ_SOFR90=[3.68561];
-const LIQ_SRF=[0.0];
-const LIQ_DW=[3.75];
-const LIQ_JPY=[-39796.4];
-const LIQ_HIBOR_SPREAD=[-134.25];
+// ── 实时数据（fetch_liquidity.py 写入 2026-03-26）──
+const LIQ_DATES=["2026-03-25", "2026-03-26"];
+const LIQ_ONRRP=[1.123, 0.777];
+const LIQ_RESERVES=[3019.995, 3019.995];
+const LIQ_TGA=[853.052, 853.052];
+const LIQ_TGA_WOW=[14.866, 14.866];
+const LIQ_SOFR=[3.63, 3.63];
+const LIQ_IORB=[3.65, 3.65];
+const LIQ_EFFR=[3.64, 3.64];
+const LIQ_SOFR90=[3.68561, 3.68561];
+const LIQ_SRF=[0.0, 0.0];
+const LIQ_DW=[3.75, 3.75];
+const LIQ_JPY=[-39796.4, -1416.6];
+const LIQ_HIBOR_SPREAD=[-134.25, -116.88];
 
-const LIQ_LATEST={"date": "2026-03-25", "onrrp": 1.123, "reserves": 3019.995, "tga": 853.052, "tga_wow": 14.866, "sofr": 3.63, "iorb": 3.65, "effr": 3.64, "sofr90": 3.68561, "sofr90_src": "SOFR90DAYAVG", "dw": 3.75, "srf": 0.0, "jpy": -39796.4, "sofr_iorb_bp": -2.0, "sofr_effr_bp": -1.0, "futures_price": 96.3144, "hibor_spread_bp": -134.25};
+const LIQ_LATEST={"date": "2026-03-26", "onrrp": 0.777, "reserves": 3019.995, "tga": 853.052, "tga_wow": 14.866, "sofr": 3.63, "iorb": 3.65, "effr": 3.64, "sofr90": 3.68561, "sofr90_src": "SOFR90DAYAVG", "dw": 3.75, "srf": 0.0, "jpy": -1416.6, "sofr_iorb_bp": -2.0, "sofr_effr_bp": -1.0, "futures_price": 96.3144, "hibor_spread_bp": -116.88};
 
 // ── 阈值配置 ──
 const THRESHOLDS = {
