@@ -612,8 +612,7 @@ def main():
         errors.append("南向资金")
 
     # ── ⑤ IORB -> SOFR-IORB ─────────────────────────────────────────
-    print("
-⑤ IORB (FRED: IORB)")
+    print("\n⑤ IORB (FRED: IORB)")
     try:
         iorb_d   = fetch_iorb()
         iorb_val = iorb_d["rate"]
@@ -630,8 +629,7 @@ def main():
         print(f"   ERROR: {e}")
 
     # ── ⑥ 银行准备金 WRESBAL ─────────────────────────────────────────
-    print("
-⑥ 银行准备金 (FRED: WRESBAL)")
+    print("\n⑥ 银行准备金 (FRED: WRESBAL)")
     try:
         w = fetch_wresbal()
         record["wresbal"] = w["value_t"]
@@ -641,8 +639,7 @@ def main():
         print(f"   ERROR: {e}")
 
     # ── ⑦ 贴现窗口 DW ────────────────────────────────────────────────
-    print("
-⑦ 贴现窗口 (FRED: DPCREDIT)")
+    print("\n⑦ 贴现窗口 (FRED: DPCREDIT)")
     try:
         dw_d = fetch_dw()
         record["dw"] = dw_d["value_bn"]
@@ -652,8 +649,7 @@ def main():
         print(f"   ERROR: {e}")
 
     # ── ⑧ 10Y TIPS ───────────────────────────────────────────────────
-    print("
-⑧ 10Y TIPS (FRED: DFII10)")
+    print("\n⑧ 10Y TIPS (FRED: DFII10)")
     try:
         t = fetch_tips_10y()
         record["tips_10y"] = t["rate"]
