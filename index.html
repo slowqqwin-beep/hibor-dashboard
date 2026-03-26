@@ -37,6 +37,7 @@
   /* kpi row */
   .kpi-row{display:grid;gap:10px;margin-bottom:4px;}
   .kpi-row-4{grid-template-columns:repeat(4,1fr);}
+  .kpi-row-5{grid-template-columns:repeat(5,1fr);}
   .kpi-row-3{grid-template-columns:repeat(3,1fr);}
   .kpi{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color .2s;}
   .kpi:hover{border-color:var(--border2);}
@@ -121,7 +122,7 @@
 
   <!-- ① 利率区 -->
   <div class="section-label">① 港元流动性</div>
-  <div class="kpi-row kpi-row-4" style="margin-bottom:10px;">
+  <div class="kpi-row kpi-row-5" style="margin-bottom:10px;">
     <div class="kpi teal">
       <div class="kpi-label">HIBOR 3M</div>
       <div class="kpi-val" id="kpi-hibor">—</div>
@@ -145,6 +146,17 @@
       <div class="kpi-val" id="kpi-south">—</div>
       <div class="kpi-sub">亿港元，净买入</div>
       <div class="signal neutral" id="sig-south">— 计算中</div>
+    </div>
+    <div class="kpi teal" id="kpi-sofrcrv-card">
+      <div class="kpi-label">SOFR 曲线 / 前瞻</div>
+      <div class="kpi-val" id="kpi-sofr6m">—</div>
+      <div class="kpi-sub">6M Term SOFR</div>
+      <div style="margin-top:7px;font-size:11px;color:var(--muted);">
+        1x3&nbsp;<span id="kpi-fwd13" style="font-weight:500;">—</span>
+        &nbsp;·&nbsp;
+        3x6&nbsp;<span id="kpi-fwd36" style="font-weight:500;">—</span>
+      </div>
+      <div class="signal neutral" id="sig-sofrcrv">— 计算中</div>
     </div>
   </div>
 
@@ -422,6 +434,28 @@ function updateKPI(){
   if(rChg>0.005){siR.className='signal bullish';siR.textContent='↑ 科技跑赢红利';}
   else if(rChg<-0.005){siR.className='signal bearish';siR.textContent='↓ 红利跑赢科技';}
   else{siR.className='signal neutral';siR.textContent='→ 比值横盘';}
+
+  // SOFR 曲线 / 远期价差
+  const s6m   = data.sofr6m  ? data.sofr6m[i]  : null;
+  const f13   = data.fwd1x3  ? data.fwd1x3[i]  : null;
+  const f36   = data.fwd3x6  ? data.fwd3x6[i]  : null;
+  if(s6m!=null) document.getElementById('kpi-sofr6m').textContent=s6m.toFixed(4)+'%';
+  if(f13!=null) document.getElementById('kpi-fwd13').textContent=(f13>=0?'+':'')+f13.toFixed(1)+'bp';
+  if(f36!=null) document.getElementById('kpi-fwd36').textContent=(f36>=0?'+':'')+f36.toFixed(1)+'bp';
+  const siCrv=document.getElementById('sig-sofrcrv');
+  const card=document.getElementById('kpi-sofrcrv-card');
+  if(f36!=null){
+    if(f36>10){
+      siCrv.className='signal bearish'; siCrv.textContent='↑ 市场预期收紧';
+      card.className='kpi red';
+    } else if(f36<-10){
+      siCrv.className='signal bullish'; siCrv.textContent='↓ 市场预期宽松';
+      card.className='kpi green';
+    } else {
+      siCrv.className='signal neutral'; siCrv.textContent='→ 曲线平坦';
+      card.className='kpi teal';
+    }
+  }
 
   document.getElementById('updateTime').textContent='最后更新: '+new Date().toLocaleString('zh-HK');
 }

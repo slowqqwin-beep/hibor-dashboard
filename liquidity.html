@@ -94,6 +94,7 @@
   /* ── indicator grid ── */
   .ind-grid{display:grid;gap:10px;margin-bottom:4px;}
   .ind-grid-3{grid-template-columns:repeat(3,1fr);}
+  .ind-grid-4{grid-template-columns:repeat(4,1fr);}
   .ind-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;overflow:hidden;transition:border-color .2s;}
   .ind-card.status-red   {border-color:rgba(248,113,113,0.35);background:linear-gradient(135deg,var(--red-dim),var(--bg2));}
   .ind-card.status-amber {border-color:rgba(251,191,36,0.35);background:linear-gradient(135deg,var(--amber-dim),var(--bg2));}
@@ -245,7 +246,7 @@
 
   <!-- Tier 2: Price -->
   <div class="section-label">第二层 · 价格信号（PRICE）</div>
-  <div class="ind-grid ind-grid-3">
+  <div class="ind-grid ind-grid-4">
     <div class="ind-card" id="card-sofr-iorb">
       <div class="ind-name">SOFR − IORB 利差</div>
       <div class="ind-val" id="val-sofr-iorb">--</div>
@@ -278,6 +279,19 @@
         <span class="ind-status" id="badge-sofr-futures">--</span>
       </div>
       <div class="threshold-info">警戒 &lt;96.40（隐含降息预期强）</div>
+    </div>
+  </div>
+
+    <div class="ind-card" id="card-sofr-3x6">
+      <div class="ind-name">SOFR 曲线斜率（3x6 价差）</div>
+      <div class="ind-val" id="val-sofr-3x6">--</div>
+      <div class="ind-unit">基点 · SOFR180DAYAVG − SOFR90DAYAVG</div>
+      <div class="sparkline-wrap" id="spark-sofr-3x6"></div>
+      <div class="ind-meta">
+        <span class="ind-chg" id="chg-sofr-3x6">--</span>
+        <span class="ind-status" id="badge-sofr-3x6">--</span>
+      </div>
+      <div class="threshold-info">警戒 &gt;+10bp（预期收紧）· &lt;-10bp 预期宽松</div>
     </div>
   </div>
 
@@ -373,6 +387,7 @@ const THRESHOLDS = {
   sofr_iorb:    { red:15,    amber:10,    dir:'gt' },
   sofr_effr:    { red:10,    amber:5,     dir:'gt' },
   sofr_futures: { red:96.40, amber:96.70, dir:'lt' },
+  sofr_3x6:     { red:10,    amber:5,     dir:'gt', greenBelow:-10 },
   jpy:          { red:-50,   amber:-30,   dir:'lt' },
   srf:          { red:30,    amber:10,    dir:'gt' },
   dw:           { red:5,     amber:2,     dir:'gt' },
@@ -382,6 +397,12 @@ function getStatus(val, key) {
   if (val === null || val === undefined || isNaN(val)) return 'na';
   const t = THRESHOLDS[key];
   if (!t) return 'na';
+  if (key === 'sofr_3x6') {
+    if (val > t.red)   return 'red';
+    if (val > t.amber) return 'amber';
+    if (t.greenBelow !== undefined && val < t.greenBelow) return 'green';
+    return 'green';
+  }
   if (t.dir === 'lt') { return val < t.red ? 'red' : val < t.amber ? 'amber' : 'green'; }
   else                { return val > t.red ? 'red' : val > t.amber ? 'amber' : 'green'; }
 }
@@ -621,6 +642,18 @@ function updateDashboard() {
   document.getElementById('badge-sofr-futures').outerHTML = statusBadge(st.sofr_futures);
   setCard('sofr-futures',st.sofr_futures);
   drawSparkline('spark-sofr-futures', sf_arr, SPARK_COLOR[st.sofr_futures], SPARK_FILL[st.sofr_futures]);
+
+  // SOFR 3x6 曲线斜率
+  const fwd3x6_arr = (typeof LIQ_FWD_3X6 !== 'undefined') ? LIQ_FWD_3X6 : [];
+  const fwd3x6_val = fwd3x6_arr.length ? fwd3x6_arr[fwd3x6_arr.length-1] : null;
+  const fwd3x6_prev = fwd3x6_arr.length>=2 ? fwd3x6_arr[fwd3x6_arr.length-2] : null;
+  const st_3x6 = getStatus(fwd3x6_val, 'sofr_3x6');
+  const fwd3x6_disp = fwd3x6_val!=null ? (fwd3x6_val>=0?'+':'')+fmtNum(fwd3x6_val,1)+'bp' : '--';
+  document.getElementById('val-sofr-3x6').textContent  = fwd3x6_disp;
+  document.getElementById('chg-sofr-3x6').innerHTML    = fmtChg(fwd3x6_val, fwd3x6_prev);
+  document.getElementById('badge-sofr-3x6').outerHTML  = statusBadge(st_3x6);
+  setCard('sofr-3x6', st_3x6);
+  drawSparkline('spark-sofr-3x6', fwd3x6_arr, SPARK_COLOR[st_3x6], SPARK_FILL[st_3x6]);
 
   document.getElementById('val-srf').textContent     = fmtNum(latest.srf,1);
   document.getElementById('chg-srf').innerHTML       = fmtChg(latest.srf, prev(LIQ_SRF));

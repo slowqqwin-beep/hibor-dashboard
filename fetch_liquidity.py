@@ -163,6 +163,20 @@ def fetch_sofr3m():
 
 
 # ════════════════════════════════════════════════════════════════════
+# ⑦b 6M SOFR Rate  SR6M → fallback SOFR180DAYAVG
+# ════════════════════════════════════════════════════════════════════
+def fetch_sofr6m():
+    print("\n⑦b 6M SOFR Rate (SR6M → fallback SOFR180DAYAVG)")
+    for sid in ("SR6M", "SOFR180DAYAVG"):
+        d, v = fred_latest(sid)
+        if v is not None:
+            print(f"   {v:.4f}%  ({d})  [{sid}]  ✓")
+            return v, sid
+    print("   ERROR: SR6M / SOFR180DAYAVG 均无数据")
+    return None, None
+
+
+# ════════════════════════════════════════════════════════════════════
 # ⑧ DW 贴现窗口 (DPCREDIT 单位已是十亿)
 # ════════════════════════════════════════════════════════════════════
 def fetch_dw():
@@ -410,6 +424,8 @@ def update_liquidity_html(history: list) -> bool:
         f"const LIQ_DW={json.dumps(col('dw'))};\n"
         f"const LIQ_JPY={json.dumps(col('jpy'))};\n"
         f"const LIQ_HIBOR_SPREAD={json.dumps(hibor_spread)};\n"
+        f"const LIQ_SOFR180={json.dumps(col('sofr180'))};\n"
+        f"const LIQ_FWD_3X6={json.dumps(col('fwd_3x6_bp'))};\n"
         f"\nconst LIQ_LATEST={json.dumps(latest, ensure_ascii=False)};"
     )
 
@@ -686,6 +702,14 @@ def main():
     else:
         errors.append("SR3M")
 
+    # ── ⑦b 6M SOFR Rate ──────────────────────────────────────────────
+    sofr6m_val, sofr6m_src = fetch_sofr6m()
+    if sofr6m_val is not None:
+        record["sofr180"] = sofr6m_val
+        record["sofr180_src"] = sofr6m_src
+    else:
+        errors.append("SR6M")
+
     # ── ⑧ DW ────────────────────────────────────────────────────────────
     v = fetch_dw()
     if v is not None: record["dw"] = v
@@ -719,6 +743,19 @@ def main():
         print(f"  JPY basis : {jbp:+.1f} bp  → {level}")
     else:
         print("  JPY basis : 数据待接入")
+    sofr_spot = record.get("sofr")
+    sofr90_v  = record.get("sofr90")
+    sofr180_v = record.get("sofr180")
+    if sofr_spot is not None and sofr90_v is not None:
+        fwd_1x3 = round((sofr90_v - sofr_spot) * 100, 2)
+        record["fwd_1x3_bp"] = fwd_1x3
+        sig = "预期升息" if fwd_1x3 > 10 else ("预期降息" if fwd_1x3 < -10 else "曲线平坦")
+        print(f"  1x3 远期价差: {fwd_1x3:+.1f} bp  → {sig}")
+    if sofr180_v is not None and sofr90_v is not None:
+        fwd_3x6 = round((sofr180_v - sofr90_v) * 100, 2)
+        record["fwd_3x6_bp"] = fwd_3x6
+        sig2 = "预期收紧" if fwd_3x6 > 10 else ("预期宽松" if fwd_3x6 < -10 else "曲线平坦")
+        print(f"  3x6 远期价差: {fwd_3x6:+.1f} bp  → {sig2}")
 
     # ── 写入 ─────────────────────────────────────────────────────────────
     print("\n── 写入 ──────────────────────────────────────────────────")

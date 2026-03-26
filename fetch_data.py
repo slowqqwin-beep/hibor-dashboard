@@ -88,6 +88,60 @@ def fetch_sofr_3m() -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────
+# ②b SOFR Spot  (FRED: SOFR)
+# ────────────────────────────────────────────────────────────────────
+def fetch_sofr_spot() -> dict:
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("FRED_API_KEY not set")
+    params = {
+        "series_id":  "SOFR",
+        "api_key":    api_key,
+        "file_type":  "json",
+        "sort_order": "desc",
+        "limit":      "5",
+    }
+    r = requests.get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params=params, timeout=15,
+    )
+    r.raise_for_status()
+    for obs in r.json().get("observations", []):
+        if obs["value"] != ".":
+            return {"date": obs["date"], "rate": float(obs["value"])}
+    raise ValueError("FRED SOFR 无有效数据")
+
+
+# ────────────────────────────────────────────────────────────────────
+# ②c Term SOFR 6M  (FRED: SOFR180DAYAVG, fallback SR6M)
+# ────────────────────────────────────────────────────────────────────
+def fetch_sofr_6m() -> dict:
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("FRED_API_KEY not set")
+    for series_id in ["SOFR180DAYAVG", "SR6M"]:
+        params = {
+            "series_id":  series_id,
+            "api_key":    api_key,
+            "file_type":  "json",
+            "sort_order": "desc",
+            "limit":      "5",
+        }
+        try:
+            r = requests.get(
+                "https://api.stlouisfed.org/fred/series/observations",
+                params=params, timeout=15,
+            )
+            r.raise_for_status()
+            for obs in r.json().get("observations", []):
+                if obs["value"] != ".":
+                    return {"date": obs["date"], "rate": float(obs["value"]), "series": series_id}
+        except Exception:
+            continue
+    raise ValueError("FRED SOFR180DAYAVG/SR6M 无有效数据")
+
+
+# ────────────────────────────────────────────────────────────────────
 # ③ ETF 收盘价
 # ────────────────────────────────────────────────────────────────────
 def fetch_etf_prices() -> dict:
@@ -161,14 +215,18 @@ def update_index_html(history: list) -> bool:
     rows = history[-MAX_CHART_DAYS:]
     n    = len(rows)
 
-    # SOFR 缺失时向前填充
-    last_sofr = 0.0
-    sofrs = []
+    # SOFR/SOFR6M/远期价差 缺失时向前填充
+    last_sofr = 0.0; last_sofr6m = 0.0; last_spot = 0.0
+    sofrs = []; sofr6ms = []; fwd1x3s = []; fwd3x6s = []
     for r in rows:
-        v = r.get("sofr")
-        if v is not None:
-            last_sofr = v
+        if r.get("sofr") is not None:      last_sofr   = r["sofr"]
+        if r.get("sofr6m") is not None:    last_sofr6m = r["sofr6m"]
+        if r.get("sofr_spot") is not None: last_spot   = r["sofr_spot"]
         sofrs.append(last_sofr)
+        sofr6ms.append(last_sofr6m)
+        s3 = last_sofr; s6 = last_sofr6m; sp = last_spot
+        fwd1x3s.append(round((s3 - sp) * 100, 2) if sp else None)
+        fwd3x6s.append(round((s6 - s3) * 100, 2) if s6 else None)
 
     dates   = [r["date"]                         for r in rows]
     hibors  = [r["hibor"]                         for r in rows]
@@ -189,10 +247,14 @@ def update_index_html(history: list) -> bool:
         f"const SOUTH ={json.dumps(souths)};\n"
         f"const ETF3033={json.dumps(etf3033)};\n"
         f"const ETF3110={json.dumps(etf3110)};\n"
-        f"const RATIO={json.dumps(ratios)};\n\n"
+        f"const RATIO={json.dumps(ratios)};\n"
+        f"const SOFR6M={json.dumps(sofr6ms)};\n"
+        f"const FWD1X3={json.dumps(fwd1x3s)};\n"
+        f"const FWD3X6={json.dumps(fwd3x6s)};\n\n"
         f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
         f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
-        f"etf3110:[...ETF3110],ratio:[...RATIO]}};"
+        f"etf3110:[...ETF3110],ratio:[...RATIO],"
+        f"sofr6m:[...SOFR6M],fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6]}};"
     )
 
     html = INDEX_HTML.read_text(encoding="utf-8")
@@ -452,6 +514,34 @@ def main():
         else:
             errors.append("SOFR")
 
+    # ── ②b SOFR Spot ─────────────────────────────────────────────────
+    print("\n②b SOFR 现货 (FRED: SOFR)")
+    try:
+        ss = fetch_sofr_spot()
+        record["sofr_spot"] = ss["rate"]
+        print(f"   {ss['rate']:.4f}%  ({ss['date']})  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["sofr_spot"] for r in reversed(hist_tmp) if r.get("sofr_spot")), None)
+        if last:
+            record["sofr_spot"] = last
+            print(f"   使用上次已知值 {last:.4f}%（填充）")
+
+    # ── ②c SOFR 6M ───────────────────────────────────────────────────
+    print("\n②c Term SOFR 6M (FRED: SOFR180DAYAVG)")
+    try:
+        s6 = fetch_sofr_6m()
+        record["sofr6m"] = s6["rate"]
+        print(f"   {s6['rate']:.4f}%  ({s6['date']})  [{s6['series']}]  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["sofr6m"] for r in reversed(hist_tmp) if r.get("sofr6m")), None)
+        if last:
+            record["sofr6m"] = last
+            print(f"   使用上次已知值 {last:.4f}%（填充）")
+
     # ── ③ ETF ────────────────────────────────────────────────────────
     print("\n③ ETF 收盘价")
     try:
@@ -486,6 +576,21 @@ def main():
     if "etf3033" in record and "etf3110" in record:
         ratio = round(record["etf3033"] / record["etf3110"], 4)
         print(f"  3033÷3110 比值  : {ratio:.4f}")
+
+    # ── SOFR 远期价差 ─────────────────────────────────────────────────
+    sofr3m_val    = record.get("sofr")
+    sofr_spot_val = record.get("sofr_spot")
+    sofr6m_val    = record.get("sofr6m")
+    if sofr3m_val is not None and sofr_spot_val is not None:
+        fwd_1x3 = round((sofr3m_val - sofr_spot_val) * 100, 2)
+        record["fwd_1x3_bp"] = fwd_1x3
+        sig = "预期升息" if fwd_1x3 > 10 else ("预期降息" if fwd_1x3 < -10 else "曲线平坦")
+        print(f"  1x3 远期价差    : {fwd_1x3:+.1f} bp  →  {sig}")
+    if sofr6m_val is not None and sofr3m_val is not None:
+        fwd_3x6 = round((sofr6m_val - sofr3m_val) * 100, 2)
+        record["fwd_3x6_bp"] = fwd_3x6
+        sig2 = "预期收紧" if fwd_3x6 > 10 else ("预期宽松" if fwd_3x6 < -10 else "曲线平坦")
+        print(f"  3x6 远期价差    : {fwd_3x6:+.1f} bp  →  {sig2}")
 
     # ── 必要字段检查 ─────────────────────────────────────────────────
     required = {"hibor", "etf3033", "etf3110"}
