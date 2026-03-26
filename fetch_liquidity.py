@@ -428,6 +428,220 @@ def update_liquidity_html(history: list) -> bool:
 
 
 # ════════════════════════════════════════════════════════════════════
+# 飞书推送 · 卡片2：美元流动性日报
+# ════════════════════════════════════════════════════════════════════
+def push_feishu_liquidity(history: list, webhook_url: str) -> None:
+    if not webhook_url or len(history) < 1:
+        print("  飞书推送：WEBHOOK_URL 未设置或无数据，跳过")
+        return
+
+    rec = history[-1]
+
+    # ── 各指标状态判断（复用与 HTML 相同的阈值） ──
+    THRESHOLDS = {
+        "onrrp":        ("lt", 10,    50),     # (方向, 红线, 黄线)
+        "reserves":     ("lt", 2900,  3100),
+        "tga_wow":      ("gt", 100,   60),
+        "sofr_iorb_bp": ("gt", 15,    10),
+        "sofr_effr_bp": ("gt", 10,    5),
+        "futures_price":("lt", 96.40, 96.70),
+        "jpy":          ("lt", -50,   -30),
+        "srf":          ("gt", 30,    10),
+        "dw":           ("gt", 5,     2),
+    }
+
+    # 计算衍生值（记录中可能已有，做兜底）
+    sofr = rec.get("sofr")
+    iorb = rec.get("iorb")
+    effr = rec.get("effr")
+    sofr90 = rec.get("sofr90")
+    derived = dict(rec)
+    if sofr and iorb and "sofr_iorb_bp" not in derived:
+        derived["sofr_iorb_bp"] = round((sofr - iorb) * 100, 1)
+    if sofr and effr and "sofr_effr_bp" not in derived:
+        derived["sofr_effr_bp"] = round((sofr - effr) * 100, 1)
+    if sofr90 and "futures_price" not in derived:
+        derived["futures_price"] = round(100 - sofr90, 4)
+
+    def status(key):
+        v = derived.get(key)
+        if v is None:
+            return "na"
+        t = THRESHOLDS.get(key)
+        if not t:
+            return "na"
+        direction, red_thr, amber_thr = t
+        if direction == "lt":
+            return "red" if v < red_thr else ("amber" if v < amber_thr else "green")
+        else:
+            return "red" if v > red_thr else ("amber" if v > amber_thr else "green")
+
+    STATUS_ICON = {"red": "🔴", "amber": "🟡", "green": "🟢", "na": "⚪"}
+    STATUS_LABEL = {"red": "警戒", "amber": "预警", "green": "正常", "na": "待接入"}
+
+    # 全部指标状态
+    all_keys = ["onrrp", "reserves", "tga_wow",
+                "sofr_iorb_bp", "sofr_effr_bp", "futures_price",
+                "jpy", "srf", "dw"]
+    statuses = {k: status(k) for k in all_keys}
+    scoreable = [s for s in statuses.values() if s != "na"]
+    red_cnt   = scoreable.count("red")
+    amber_cnt = scoreable.count("amber")
+    green_cnt = scoreable.count("green")
+
+    # ── 仓位信号（复用 HTML 逻辑） ──
+    tier1_red = any(statuses[k] == "red" for k in ["onrrp", "reserves", "tga_wow"])
+    tier2_red = any(statuses[k] == "red" for k in ["sofr_iorb_bp", "sofr_effr_bp", "futures_price"])
+    tier3_red = any(statuses[k] == "red" for k in ["jpy", "srf", "dw"])
+    all_tiers_red = tier1_red and tier2_red and tier3_red
+
+    if all_tiers_red:
+        pos_label, header_tpl = "全力防守 · 空仓+全面对冲", "red"
+    elif red_cnt >= 2:
+        pos_label, header_tpl = "空仓 · 买保护",            "red"
+    elif red_cnt >= 1 and amber_cnt >= 1:
+        pos_label, header_tpl = "两成仓 · 对冲",            "orange"
+    elif red_cnt >= 1 or amber_cnt >= 2:
+        pos_label, header_tpl = "半仓观望",                  "yellow"
+    elif amber_cnt >= 1:
+        pos_label, header_tpl = "七成仓",                    "green"
+    else:
+        pos_label, header_tpl = "全力做多 · 满仓配置",       "green"
+
+    # ── 标题前缀 ──
+    title_prefix = "⚠️ " if red_cnt > 0 or amber_cnt > 0 else "📊 "
+    needs_attention = "  ⚠️ 需关注" if red_cnt > 0 else ""
+
+    # ── 红/黄 预警列表 ──
+    def _fmtv(v, fmt, fallback="?"):
+        try:
+            return format(v, fmt) if v is not None else fallback
+        except Exception:
+            return fallback
+
+    LABEL_MAP = {
+        "onrrp":        f"ON RRP {_fmtv(rec.get('onrrp'), '.1f')}B",
+        "reserves":     f"储备金 {_fmtv(rec.get('reserves'), '.0f')}B",
+        "tga_wow":      f"TGA周变化 {_fmtv(rec.get('tga_wow'), '+.1f')}B",
+        "sofr_iorb_bp": f"SOFR-IORB {_fmtv(derived.get('sofr_iorb_bp'), '+.1f')}bp",
+        "sofr_effr_bp": f"SOFR-EFFR {_fmtv(derived.get('sofr_effr_bp'), '+.1f')}bp",
+        "futures_price":f"3M期货价 {_fmtv(derived.get('futures_price'), '.3f')}",
+        "jpy":          f"JPY basis {_fmtv(rec.get('jpy'), '+.1f')}bp" if rec.get('jpy') is not None else "JPY basis 待接入",
+        "srf":          f"SRF {_fmtv(rec.get('srf'), '.1f')}B",
+        "dw":           f"DW {_fmtv(rec.get('dw'), '.1f')}B",
+    }
+    THRESH_DESC = {
+        "onrrp":        "警戒 <10B",
+        "reserves":     "警戒 <2900B",
+        "tga_wow":      "警戒 >+100B",
+        "sofr_iorb_bp": "警戒 >15bp",
+        "sofr_effr_bp": "警戒 >10bp",
+        "futures_price":"警戒 <96.40",
+        "jpy":          "警戒 <-50bp",
+        "srf":          "警戒 >30B",
+        "dw":           "警戒 >5B",
+    }
+
+    alert_lines = []
+    for k in all_keys:
+        s = statuses[k]
+        if s in ("red", "amber"):
+            alert_lines.append(
+                f"{STATUS_ICON[s]} **{LABEL_MAP[k]}** （{THRESH_DESC.get(k,'')}·{STATUS_LABEL[s]}）"
+            )
+
+    # ── 关键数值行 ──
+    def fv(key, fmt=".1f"):
+        v = derived.get(key)
+        try:
+            return format(v, fmt) if v is not None else "--"
+        except Exception:
+            return "--"
+
+    kv_line = (
+        f"ON RRP **{fv('onrrp')}B** ｜ 储备金 **{fv('reserves', '.0f')}B** ｜ TGA变化 **{fv('tga_wow', '+.1f')}B**\n"
+        f"SOFR−IORB **{fv('sofr_iorb_bp', '+.1f')}bp** ｜ SRF **{fv('srf')}B** ｜ DW **{fv('dw')}B**"
+    )
+
+    # ── 构建卡片 ──
+    elements = []
+
+    # 评级 + 仓位
+    elements.append({
+        "tag": "div",
+        "fields": [
+            {
+                "is_short": True,
+                "text": {
+                    "tag": "lark_md",
+                    "content": (
+                        f"**综合评级**{needs_attention}\n"
+                        f"🔴×{red_cnt}  🟡×{amber_cnt}  🟢×{green_cnt}"
+                    )
+                }
+            },
+            {
+                "is_short": True,
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**仓位建议**\n**{pos_label}**"
+                }
+            }
+        ]
+    })
+
+    # 预警触发列表（有才显示）
+    if alert_lines:
+        elements.append({"tag": "hr"})
+        elements.append({
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": "**触发预警指标：**\n" + "\n".join(alert_lines)
+            }
+        })
+
+    # 关键数值
+    elements.append({"tag": "hr"})
+    elements.append({
+        "tag": "div",
+        "text": {"tag": "lark_md", "content": f"**关键数值**\n{kv_line}"}
+    })
+
+    # 脚注
+    elements.append({
+        "tag": "note",
+        "elements": [{"tag": "plain_text",
+                      "content": f"数据来源：FRED · H.4.1 · yfinance · 自动更新 {rec['date']}"}]
+    })
+
+    card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {
+                "tag": "plain_text",
+                "content": f"{title_prefix}美元流动性日报 · {rec['date']}"
+            },
+            "template": header_tpl
+        },
+        "elements": elements
+    }
+
+    try:
+        r = requests.post(
+            webhook_url,
+            json={"msg_type": "interactive", "card": card},
+            timeout=15, verify=False
+        )
+        if r.status_code == 200 and r.json().get("StatusCode") == 0:
+            print("  飞书推送 OK（美元流动性日报）")
+        else:
+            print(f"  飞书推送失败: {r.status_code}  {r.text[:120]}")
+    except Exception as e:
+        print(f"  飞书推送异常: {e}")
+
+
+# ════════════════════════════════════════════════════════════════════
 # Main
 # ════════════════════════════════════════════════════════════════════
 def main():
@@ -516,6 +730,10 @@ def main():
         print(f"\n  注意：以下指标获取失败 → {', '.join(errors)}")
     else:
         print("\n  全部完成 ✓")
+
+    # ── 飞书推送 ──────────────────────────────────────────────────────
+    print("\n── 飞书推送 ────────────────────────────────────────────────")
+    push_feishu_liquidity(history, os.environ.get("WEBHOOK_URL", ""))
 
 
 if __name__ == "__main__":
