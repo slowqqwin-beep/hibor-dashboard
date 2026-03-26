@@ -22,7 +22,48 @@ jobs:
 
       - name: Install dependencies
         run: pip install requests akshare yfinance beautifulsoup4
+      - name: 飞书推送港股流动性日报
+          env:
+            WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          run: |
+            python - <<'EOF'
+            import json, os, requests
+            from pathlib import Path
 
+            webhook = os.environ.get("WEBHOOK_URL", "")
+            if not webhook:
+                print("WEBHOOK_URL 未设置，跳过"); exit(0)
+
+            history = json.loads(Path("data/history.json").read_text())
+            if not history:
+                print("无数据，跳过"); exit(0)
+
+            t = history[-1]
+            p = history[-2] if len(history) > 1 else t
+
+            hibor  = t.get("hibor", 0)
+            sofr   = t.get("sofr", 0)
+            spread = t.get("spread_bp", round((hibor - sofr) * 100, 2))
+            south  = t.get("south") or 0
+            date   = t.get("date", "")
+
+            hibor_chg  = hibor  - p.get("hibor", hibor)
+            spread_chg = spread - p.get("spread_bp", spread)
+
+            signal = "🟢 港元宽松" if spread < -10 else ("🔴 港元偏紧" if spread > 10 else "🟡 利差中性")
+
+            msg = f"""📊 港股流动性日报 · {date}
+
+    HIBOR 3M  : {hibor:.4f}%  ({hibor_chg:+.4f}%)
+    SOFR 3M   : {sofr:.4f}%
+    利差       : {spread:+.1f} bp  ({spread_chg:+.1f} bp)  {signal}
+    3033.HK   : HK${t.get('etf3033', 0):.3f}
+    3110.HK   : HK${t.get('etf3110', 0):.3f}
+    南向资金   : {south:+.2f} 亿元"""
+
+            r = requests.post(webhook, json={"msg_type": "text", "content": {"text": msg}}, timeout=15)
+            print(f"飞书推送: {r.status_code}  {r.text[:100]}")
+            EOF
       - name: Commit and push
         run: |
           git config user.name  "github-actions[bot]"
