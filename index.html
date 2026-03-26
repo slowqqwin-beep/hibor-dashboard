@@ -64,6 +64,14 @@
   .signal.bearish{background:var(--red-dim);color:var(--red);border:0.5px solid rgba(248,113,113,0.2);}
   .signal.neutral{background:var(--teal-dim);color:var(--teal);border:0.5px solid rgba(45,212,191,0.2);}
   .signal.warning{background:var(--amber-dim);color:var(--amber);border:0.5px solid rgba(251,191,36,0.2);}
+  /* 流动性底层 */
+  .liq-badge{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:500;letter-spacing:0.06em;margin-bottom:10px;border:0.5px solid;width:fit-content;}
+  .liq-badge.green{background:var(--green-dim);color:var(--green);border-color:rgba(74,222,128,0.25);}
+  .liq-badge.amber{background:var(--amber-dim);color:var(--amber);border-color:rgba(251,191,36,0.25);}
+  .liq-badge.red{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,0.25);}
+  .liq-badge.red.blink{animation:liqblink 1s infinite;}
+  @keyframes liqblink{0%,100%{opacity:1}50%{opacity:0.35}}
+  .kpi-threshold{font-size:9px;color:var(--dim);margin-top:4px;}
 
   /* charts */
   .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
@@ -183,6 +191,49 @@
     </div>
   </div>
 
+  <!-- ③ 美元流动性底层指标 -->
+  <div class="section-label">③ 美元流动性底层指标 · SOFR-IORB / 准备金 / 贴现窗口 / TIPS</div>
+  <!-- 联动状态徽章 -->
+  <div class="liq-badge green" id="liq-badge">
+    <span id="liq-badge-dot">●</span>
+    <span id="liq-badge-text">— 计算中</span>
+  </div>
+  <!-- 4张KPI卡 -->
+  <div class="kpi-row kpi-row-4" style="margin-bottom:10px;">
+    <!-- SOFR-IORB -->
+    <div class="kpi green" id="kpi-sofr-iorb-card">
+      <div class="kpi-label">SOFR − IORB 利差</div>
+      <div class="kpi-val" id="kpi-sofr-iorb">—</div>
+      <div class="kpi-sub">bp · 准备金充裕度早期预警</div>
+      <div class="kpi-threshold">领先 WRESBAL 1-2 周</div>
+      <div class="signal neutral" id="sig-sofr-iorb">— 计算中</div>
+    </div>
+    <!-- WRESBAL -->
+    <div class="kpi blue" id="kpi-wresbal-card">
+      <div class="kpi-label">银行准备金 WRESBAL</div>
+      <div class="kpi-val" id="kpi-wresbal">—</div>
+      <div class="kpi-sub">万亿美元 · 周频</div>
+      <div class="kpi-threshold" id="kpi-wresbal-dist">距3.0T: —</div>
+      <div class="signal neutral" id="sig-wresbal">— 计算中</div>
+    </div>
+    <!-- DW -->
+    <div class="kpi amber" id="kpi-dw-card">
+      <div class="kpi-label">贴现窗口 DPCREDIT</div>
+      <div class="kpi-val" id="kpi-dw">—</div>
+      <div class="kpi-sub">十亿美元 · 周频</div>
+      <div class="kpi-threshold" id="kpi-dw-chg">较上周: —</div>
+      <div class="signal neutral" id="sig-dw">— 计算中</div>
+    </div>
+    <!-- TIPS 10Y -->
+    <div class="kpi purple" id="kpi-tips-card">
+      <div class="kpi-label">10Y TIPS 实际利率</div>
+      <div class="kpi-val" id="kpi-tips">—</div>
+      <div class="kpi-sub">% · DFII10 日频</div>
+      <div class="kpi-threshold">↑压制科技估值 · ↓利好黄金</div>
+      <div class="signal neutral" id="sig-tips">— 计算中</div>
+    </div>
+  </div>
+
   <!-- Charts Row 1 -->
   <div class="charts-grid">
     <div class="chart-card">
@@ -221,6 +272,18 @@
     <div class="chart-card full">
       <div class="card-title">核心联动：HIBOR−SOFR 利差 vs 3033÷3110 比值 vs 南向资金</div>
       <div class="chart-wrap-lg"><canvas id="chartOverlay"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Chart Row 4: 利率压力双指标 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">利率压力双指标 · SOFR-IORB &amp; 10Y TIPS · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartLiqPressure"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">准备金 + 贴现窗口 · 周频确认 · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartReserves"></canvas></div>
     </div>
   </div>
 
@@ -298,7 +361,7 @@ const baseScales={
 };
 const baseOpts={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:baseScales,elements:{point:{radius:0,hoverRadius:4}}};
 
-let chartRates,chartSpread,chartETF,chartRatio,chartOverlay;
+let chartRates,chartSpread,chartETF,chartRatio,chartOverlay,chartLiqPressure,chartReserves;
 
 function initCharts(){
   const labels=data.dates;
@@ -369,6 +432,87 @@ function initCharts(){
         y3:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'亿'},title:{display:true,text:'南向亿',color:'#fbbf24',font:{size:9}},offset:true}
       }
     }
+  });
+
+  // 6. SOFR-IORB + TIPS 双轴
+  const siData = data.sofrIorb || [];
+  const tipsData = data.tips || [];
+  chartLiqPressure = new Chart(document.getElementById('chartLiqPressure'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'SOFR-IORB (bp)',data:siData,borderColor:'#fb923c',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'yL',
+       spanGaps:true},
+      {label:'10Y TIPS (%)',data:tipsData,borderColor:'#a78bfa',borderWidth:1.8,tension:0.4,borderDash:[5,3],fill:false,yAxisID:'yR',
+       spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{
+        legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#fb923c')},
+        annotation:{annotations:{
+          line10:{type:'line',yScaleID:'yL',yMin:10,yMax:10,borderColor:'rgba(248,113,113,0.4)',borderWidth:1,borderDash:[4,4]},
+          line5:{type:'line',yScaleID:'yL',yMin:5,yMax:5,borderColor:'rgba(251,191,36,0.35)',borderWidth:1,borderDash:[4,4]},
+          tipsLine:{type:'line',yScaleID:'yR',yMin:2.0,yMax:2.0,borderColor:'rgba(167,139,250,0.4)',borderWidth:1,borderDash:[4,4]}
+        }}
+      },
+      scales:{
+        x:baseScales.x,
+        yL:{...baseScales.y,position:'left',
+          ticks:{callback:v=>v+'bp'},
+          title:{display:true,text:'SOFR-IORB bp',color:'#fb923c',font:{size:9}}},
+        yR:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},
+          ticks:{callback:v=>v+'%'},
+          title:{display:true,text:'TIPS %',color:'#a78bfa',font:{size:9}}}
+      }
+    }
+  });
+
+  // 7. WRESBAL + DW 双轴（带背景插件）
+  const wData = data.wresbal || [];
+  const dwData = data.dw || [];
+  const wPlugin = {
+    id:'wBg',
+    beforeDraw(chart){
+      const {ctx,chartArea:{top,bottom,left,right},scales:{yL:ys,x:xs}}=chart;
+      if(!ys)return;
+      const y3  = ys.getPixelForValue(3.0);
+      const y29 = ys.getPixelForValue(2.9);
+      const yBot = ys.getPixelForValue(ys.min);
+      // green zone >3.0T
+      ctx.save();
+      ctx.fillStyle='rgba(74,222,128,0.04)';
+      ctx.fillRect(left,top,right-left,y3-top);
+      // red zone <2.9T
+      ctx.fillStyle='rgba(248,113,113,0.06)';
+      ctx.fillRect(left,y29,right-left,yBot-y29);
+      ctx.restore();
+    }
+  };
+  chartReserves = new Chart(document.getElementById('chartReserves'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'WRESBAL (T)',data:wData,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'yL',
+       spanGaps:true},
+      {label:'贴现窗口 (B)',data:dwData,borderColor:'#f87171',borderWidth:1.5,borderDash:[6,3],tension:0.3,fill:false,yAxisID:'yR',
+       spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{
+        legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#60a5fa')},
+        wBg:{}
+      },
+      scales:{
+        x:baseScales.x,
+        yL:{...baseScales.y,position:'left',
+          ticks:{callback:v=>(v!=null?v.toFixed(2)+'T':'')},
+          title:{display:true,text:'准备金 T',color:'#60a5fa',font:{size:9}}},
+        yR:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},
+          ticks:{callback:v=>(v!=null?v.toFixed(1)+'B':'')},
+          title:{display:true,text:'DW B',color:'#f87171',font:{size:9}}}
+      }
+    },
+    plugins:[wPlugin]
   });
 }
 
@@ -462,6 +606,97 @@ function updateKPI(){
   }
 
   document.getElementById('updateTime').textContent='最后更新: '+new Date().toLocaleString('zh-HK');
+
+  // ── ③ 美元流动性底层指标 ──────────────────────────────────────────
+  const si  = data.sofrIorb ? data.sofrIorb[i]  : null;
+  const wre = data.wresbal   ? data.wresbal[i]   : null;
+  const dw  = data.dw        ? data.dw[i]        : null;
+  const tip = data.tips      ? data.tips[i]      : null;
+
+  // SOFR-IORB
+  if(si!=null){
+    document.getElementById('kpi-sofr-iorb').textContent=(si>=0?'+':'')+si.toFixed(1)+'bp';
+    const siCard=document.getElementById('kpi-sofr-iorb-card');
+    const siSig=document.getElementById('sig-sofr-iorb');
+    // check 3-day persistence
+    let hi3=true;
+    for(let k=1;k<=3;k++){const v=data.sofrIorb[i-k];if(v==null||v<=10){hi3=false;break;}}
+    if(si<5){
+      siCard.className='kpi green'; siSig.className='signal bullish'; siSig.textContent='准备金充裕';
+    } else if(si<10){
+      siCard.className='kpi amber'; siSig.className='signal warning'; siSig.textContent='开始分化';
+    } else {
+      siCard.className='kpi red'; siSig.className='signal bearish';
+      siSig.textContent=hi3?'压力信号 持续3日':'压力信号';
+      if(hi3) siCard.classList.add('blink');
+    }
+  }
+
+  // WRESBAL
+  if(wre!=null){
+    document.getElementById('kpi-wresbal').textContent=wre.toFixed(3)+'T';
+    const dist=wre-3.0;
+    document.getElementById('kpi-wresbal-dist').textContent='距3.0T: '+(dist>=0?'+':'')+dist.toFixed(3)+'T';
+    const wCard=document.getElementById('kpi-wresbal-card');
+    const wSig=document.getElementById('sig-wresbal');
+    if(wre>3.0){
+      wCard.className='kpi green'; wSig.className='signal bullish'; wSig.textContent='理想 >3.0T';
+    } else if(wre>2.9){
+      wCard.className='kpi amber'; wSig.className='signal warning'; wSig.textContent='警戒 2.9~3.0T';
+    } else {
+      wCard.className='kpi red'; wSig.className='signal bearish'; wSig.textContent='危险 <2.9T';
+    }
+  }
+
+  // DW
+  if(dw!=null){
+    document.getElementById('kpi-dw').textContent=dw.toFixed(2)+'B';
+    // week-over-week change (find prev non-null)
+    let prevDw=null;
+    for(let k=i-1;k>=0;k--){if(data.dw[k]!=null){prevDw=data.dw[k];break;}}
+    if(prevDw!=null){
+      const chgDw=dw-prevDw;
+      document.getElementById('kpi-dw-chg').textContent='较上周: '+(chgDw>=0?'+':'')+chgDw.toFixed(2)+'B';
+    }
+    const dwCard=document.getElementById('kpi-dw-card');
+    const dwSig=document.getElementById('sig-dw');
+    if(dw<2){
+      dwCard.className='kpi green'; dwSig.className='signal bullish'; dwSig.textContent='正常 <2B';
+    } else if(dw<5){
+      dwCard.className='kpi amber'; dwSig.className='signal warning'; dwSig.textContent='警戒 2~5B';
+    } else {
+      dwCard.className='kpi red'; dwSig.className='signal bearish'; dwSig.textContent='危险 >5B';
+    }
+  }
+
+  // TIPS
+  if(tip!=null){
+    document.getElementById('kpi-tips').textContent=tip.toFixed(3)+'%';
+    const tipCard=document.getElementById('kpi-tips-card');
+    const tipSig=document.getElementById('sig-tips');
+    const prevTip=data.tips[Math.max(0,i-5)];
+    const tipChg=prevTip!=null?tip-prevTip:0;
+    if(tipChg<-0.1){
+      tipCard.className='kpi green'; tipSig.className='signal bullish'; tipSig.textContent='↓ 实际利率下行';
+    } else if(tipChg>0.1){
+      tipCard.className='kpi red'; tipSig.className='signal bearish'; tipSig.textContent='↑ 压制估值';
+    } else {
+      tipCard.className='kpi purple'; tipSig.className='signal neutral'; tipSig.textContent='→ 横盘';
+    }
+  }
+
+  // 联动徽章
+  const badge=document.getElementById('liq-badge');
+  const badgeText=document.getElementById('liq-badge-text');
+  if(wre!=null&&dw!=null){
+    if(wre>3.0&&dw<2){
+      badge.className='liq-badge green'; badgeText.textContent='流动性理想 · WRESBAL>3T & DW<2B';
+    } else if(wre<2.9||dw>5){
+      badge.className='liq-badge red blink'; badgeText.textContent='流动性危险 · WRESBAL<2.9T 或 DW>5B';
+    } else {
+      badge.className='liq-badge amber'; badgeText.textContent='流动性警戒 · 接近阈值';
+    }
+  }
 }
 
 // ── 数据表 ──
@@ -498,10 +733,30 @@ function updateInterp(){
   const i=data.dates.length-1;
   const sp=data.spread[i],so=data.south[i],r=data.ratio[i];
   const rPrev=data.ratio[Math.max(0,i-5)];
+  // 新指标
+  const siV  = data.sofrIorb ? data.sofrIorb[i]  : null;
+  const wreV = data.wresbal   ? data.wresbal[i]   : null;
+  const tipV = data.tips      ? data.tips[i]      : null;
+  const tipPrev = data.tips   ? data.tips[Math.max(0,i-5)] : null;
+  const tipChg = (tipV!=null&&tipPrev!=null) ? tipV-tipPrev : null;
   const rChg=((r-rPrev)/rPrev*100).toFixed(1);
   const spAvg=data.spread.slice(-20).reduce((a,b)=>a+b,0)/20;
 
   let t='<strong>综合解读：</strong>';
+
+  // ── 美元流动性底层信号 ──
+  let liqScore=0;
+  if(siV!=null&&siV<5) liqScore++; else if(siV!=null&&siV>10) liqScore--;
+  if(wreV!=null&&wreV>3.0) liqScore++; else if(wreV!=null&&wreV<2.9) liqScore-=2;
+  if(tipChg!=null&&tipChg<-0.1) liqScore++; else if(tipChg!=null&&tipChg>0.1) liqScore--;
+  if(liqScore>=2&&sp<-10){
+    t+='<strong>【做多加权】</strong> SOFR-IORB充裕+WRESBAL>3T+TIPS下行，美元流动性底层向好，与港元宽松共振——3033 积极做多。 ';
+  } else if(liqScore<=-2||siV>10&&wreV<2.9&&tipChg>0.1){
+    t+='<strong>【做空加权】</strong> SOFR-IORB>10bp+WRESBAL<2.9T+TIPS上行，美元流动性底层恶化——减仓3033，转守3110。 ';
+  } else if(siV!=null){
+    t+=`SOFR-IORB ${siV>=0?'+':''}${siV!=null?siV.toFixed(1):'--'}bp（准备金底层）· WRESBAL ${wreV!=null?wreV.toFixed(3)+'T':'--'} · TIPS ${tipV!=null?tipV.toFixed(3)+'%':'--'}，底层流动性尚稳。 `;
+  }
+
 
   // 流动性
   if(sp<-10)t+=`HIBOR-SOFR利差 <strong>${sp.toFixed(1)}bp</strong>，港元流动性明显宽松，利率环境有利于高估值科技股折现率下行。`;

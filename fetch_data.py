@@ -140,6 +140,36 @@ def fetch_sofr_6m() -> dict:
             continue
     raise ValueError("FRED SOFR180DAYAVG/SR6M 无有效数据")
 
+# helper
+def _fred_latest(series_id: str) -> tuple:
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("FRED_API_KEY not set")
+    params = {"series_id": series_id, "api_key": api_key, "file_type": "json",
+              "sort_order": "desc", "limit": "10"}
+    r = requests.get("https://api.stlouisfed.org/fred/series/observations",
+                     params=params, timeout=15)
+    r.raise_for_status()
+    for obs in r.json().get("observations", []):
+        if obs["value"] not in (".", ""):
+            return obs["date"], float(obs["value"])
+    raise ValueError(f"FRED {series_id} 无数据")
+
+
+def fetch_iorb() -> dict:
+    d, v = _fred_latest("IORB"); return {"date": d, "rate": v}
+
+def fetch_wresbal() -> dict:
+    d, v = _fred_latest("WRESBAL"); return {"date": d, "value_t": round(v/1000, 3)}
+
+def fetch_dw() -> dict:
+    d, v = _fred_latest("DPCREDIT"); return {"date": d, "value_bn": round(v/1000, 3)}
+
+def fetch_tips_10y() -> dict:
+    d, v = _fred_latest("DFII10"); return {"date": d, "rate": v}
+
+
+
 
 # ────────────────────────────────────────────────────────────────────
 # ③ ETF 收盘价
@@ -217,16 +247,26 @@ def update_index_html(history: list) -> bool:
 
     # SOFR/SOFR6M/远期价差 缺失时向前填充
     last_sofr = 0.0; last_sofr6m = 0.0; last_spot = 0.0
+    last_sofr_iorb = None; last_wresbal = None; last_dw = None; last_tips = None
     sofrs = []; sofr6ms = []; fwd1x3s = []; fwd3x6s = []
+    sofr_iorbs = []; wresbals = []; dws = []; tips_arr = []
     for r in rows:
-        if r.get("sofr") is not None:      last_sofr   = r["sofr"]
-        if r.get("sofr6m") is not None:    last_sofr6m = r["sofr6m"]
-        if r.get("sofr_spot") is not None: last_spot   = r["sofr_spot"]
+        if r.get("sofr") is not None:       last_sofr      = r["sofr"]
+        if r.get("sofr6m") is not None:     last_sofr6m    = r["sofr6m"]
+        if r.get("sofr_spot") is not None:  last_spot      = r["sofr_spot"]
+        if r.get("sofr_iorb") is not None:  last_sofr_iorb = r["sofr_iorb"]
+        if r.get("wresbal") is not None:    last_wresbal   = r["wresbal"]
+        if r.get("dw") is not None:         last_dw        = r["dw"]
+        if r.get("tips_10y") is not None:   last_tips      = r["tips_10y"]
         sofrs.append(last_sofr)
         sofr6ms.append(last_sofr6m)
         s3 = last_sofr; s6 = last_sofr6m; sp = last_spot
         fwd1x3s.append(round((s3 - sp) * 100, 2) if sp else None)
         fwd3x6s.append(round((s6 - s3) * 100, 2) if s6 else None)
+        sofr_iorbs.append(last_sofr_iorb)
+        wresbals.append(last_wresbal)
+        dws.append(last_dw)
+        tips_arr.append(last_tips)
 
     dates   = [r["date"]                         for r in rows]
     hibors  = [r["hibor"]                         for r in rows]
@@ -250,11 +290,16 @@ def update_index_html(history: list) -> bool:
         f"const RATIO={json.dumps(ratios)};\n"
         f"const SOFR6M={json.dumps(sofr6ms)};\n"
         f"const FWD1X3={json.dumps(fwd1x3s)};\n"
-        f"const FWD3X6={json.dumps(fwd3x6s)};\n\n"
+        f"const FWD3X6={json.dumps(fwd3x6s)};\n"
+        f"const SOFR_IORB={json.dumps(sofr_iorbs)};\n"
+        f"const WRESBAL={json.dumps(wresbals)};\n"
+        f"const DW={json.dumps(dws)};\n"
+        f"const TIPS10Y={json.dumps(tips_arr)};\n\n"
         f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
         f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
         f"etf3110:[...ETF3110],ratio:[...RATIO],"
-        f"sofr6m:[...SOFR6M],fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6]}};"
+        f"sofr6m:[...SOFR6M],fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6],"
+        f"sofrIorb:[...SOFR_IORB],wresbal:[...WRESBAL],dw:[...DW],tips:[...TIPS10Y]}};"
     )
 
     html = INDEX_HTML.read_text(encoding="utf-8")
@@ -565,6 +610,57 @@ def main():
     except Exception as e:
         print(f"   ERROR: {e}")
         errors.append("南向资金")
+
+    # ── ⑤ IORB -> SOFR-IORB ─────────────────────────────────────────
+    print("
+⑤ IORB (FRED: IORB)")
+    try:
+        iorb_d   = fetch_iorb()
+        iorb_val = iorb_d["rate"]
+        record["iorb"] = iorb_val
+        sofr_spot_v = record.get("sofr_spot")
+        if sofr_spot_v is not None:
+            sib = round((sofr_spot_v - iorb_val) * 100, 2)
+            record["sofr_iorb"] = sib
+            sig = "准备金充裕" if sib < 5 else ("开始分化" if sib < 10 else "压力信号")
+            print(f"   IORB={iorb_val:.3f}%  SOFR-IORB={sib:+.1f}bp -> {sig}  ok")
+        else:
+            print(f"   IORB={iorb_val:.3f}% (sofr_spot 缺失)")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+
+    # ── ⑥ 银行准备金 WRESBAL ─────────────────────────────────────────
+    print("
+⑥ 银行准备金 (FRED: WRESBAL)")
+    try:
+        w = fetch_wresbal()
+        record["wresbal"] = w["value_t"]
+        sig = "理想" if w["value_t"] > 3.0 else ("警戒" if w["value_t"] > 2.9 else "危险")
+        print(f"   {w['value_t']:.3f}T  ({w['date']})  -> {sig}  ok")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+
+    # ── ⑦ 贴现窗口 DW ────────────────────────────────────────────────
+    print("
+⑦ 贴现窗口 (FRED: DPCREDIT)")
+    try:
+        dw_d = fetch_dw()
+        record["dw"] = dw_d["value_bn"]
+        sig = "正常" if dw_d["value_bn"] < 2 else ("警戒" if dw_d["value_bn"] < 5 else "危险")
+        print(f"   {dw_d['value_bn']:.3f}B  ({dw_d['date']})  -> {sig}  ok")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+
+    # ── ⑧ 10Y TIPS ───────────────────────────────────────────────────
+    print("
+⑧ 10Y TIPS (FRED: DFII10)")
+    try:
+        t = fetch_tips_10y()
+        record["tips_10y"] = t["rate"]
+        sig = "利好黄金" if t["rate"] < 1.5 else ("压制估值" if t["rate"] > 2.0 else "中性")
+        print(f"   {t['rate']:.3f}%  ({t['date']})  -> {sig}  ok")
+    except Exception as e:
+        print(f"   ERROR: {e}")
 
     # ── 利差 ─────────────────────────────────────────────────────────
     if "hibor" in record and "sofr" in record:
