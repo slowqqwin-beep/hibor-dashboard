@@ -38,5 +38,27 @@
     "futures_price": 96.3144,
     "fwd_1x3_bp": 5.56,
     "fwd_3x6_bp": 19.59
+  },
+  {
+    "date": "2026-03-27",
+    "onrrp": 0.885,
+    "reserves": 2993.955,
+    "tga": 874.077,
+    "tga_wow": 21.025,
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "effr": 3.64,
+    "sofr90": 3.68538,
+    "sofr90_src": "SOFR90DAYAVG",
+    "sofr180": 3.87855,
+    "sofr180_src": "SOFR180DAYAVG",
+    "dw": 3.75,
+    "srf": 0.0,
+    "jpy": -1377.6,
+    "sofr_iorb_bp": -1.0,
+    "sofr_effr_bp": 0.0,
+    "futures_price": 96.3146,
+    "fwd_1x3_bp": 4.54,
+    "fwd_3x6_bp": 19.32
   }
 ]
