@@ -2,7 +2,7 @@ name: Daily Data Update
 
 on:
   schedule:
-    - cron: "30 9 * * *"
+    - cron: "30 9 * * *"   # UTC 09:30 = 北京 17:30，美股收盘后
   workflow_dispatch:
 
 jobs:
@@ -29,17 +29,11 @@ jobs:
           WEBHOOK_URL:  ${{ secrets.WEBHOOK_URL }}
         run: python fetch_data.py
 
-      - name: Run fetch_liquidity.py
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          WEBHOOK_URL:  ${{ secrets.WEBHOOK_URL }}
-        run: python fetch_liquidity.py
-
       - name: Commit and push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html data/history.json liquidity.html data/liquidity_history.json
+          git add index.html data/history.json
           git diff --cached --quiet || git commit -m "chore: daily data update $(date -u +%Y-%m-%d)"
           git pull --rebase origin main
           git push

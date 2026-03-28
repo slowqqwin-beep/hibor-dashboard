@@ -95,7 +95,106 @@ def fetch_sofr_3m() -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────
-# ③ ETF 收盘价
+# ③ 美元流动性底层指标（原 fetch_liquidity.py）
+#    ON RRP / WRESBAL / TGA / overnight SOFR / IORB / EFFR / DW / SRF
+# ────────────────────────────────────────────────────────────────────
+def fetch_liq_bundle() -> dict:
+    """
+    批量抓取美元流动性底层指标，全部来自 FRED（SRF 来自 Fed H.4.1）。
+    返回字典，失败的字段不包含（调用方需做 .get() 防御）。
+    字段说明：
+      onrrp       B    ON RRP 隔夜逆回购
+      reserves    T    银行准备金 (WRESBAL, M→T)
+      tga         B    TGA (WTREGEN, M→B)
+      tga_wow     B    TGA 周变化
+      sofr_on     %    Overnight SOFR
+      iorb        %    IORB
+      effr        %    联邦基金有效利率
+      dw          B    贴现窗口 DPCREDIT
+      srf         B    SRF 常备回购 (H.4.1)
+      sofr_iorb_bp bp  (sofr_on - iorb)×100
+    """
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("FRED_API_KEY not set")
+    result = {}
+
+    def _get(sid, divisor=1):
+        params = {"series_id": sid, "api_key": api_key, "file_type": "json",
+                  "sort_order": "desc", "limit": "5"}
+        r = requests.get("https://api.stlouisfed.org/fred/series/observations",
+                         params=params, timeout=15)
+        r.raise_for_status()
+        for o in r.json().get("observations", []):
+            if o["value"] != ".":
+                return round(float(o["value"]) / divisor, 3)
+        return None
+
+    # ON RRP（十亿美元）
+    v = _get("RRPONTSYD"); result["onrrp"] = v if v is not None else None
+    # 银行准备金（WRESBAL 单位 B → ÷1000 = T）
+    v = _get("WRESBAL", 1000); result["reserves"] = v if v is not None else None
+    # TGA（WTREGEN 单位 M → ÷1000 = B）
+    try:
+        params = {"series_id": "WTREGEN", "api_key": api_key, "file_type": "json",
+                  "sort_order": "desc", "limit": "5"}
+        r = requests.get("https://api.stlouisfed.org/fred/series/observations",
+                         params=params, timeout=15)
+        r.raise_for_status()
+        obs = [o for o in r.json().get("observations", []) if o["value"] != "."]
+        if obs:
+            result["tga"] = round(float(obs[0]["value"]) / 1000, 3)
+            result["tga_wow"] = (round(result["tga"] - float(obs[1]["value"]) / 1000, 3)
+                                 if len(obs) >= 2 else 0.0)
+    except Exception as e:
+        print(f"   TGA ERROR: {e}")
+    # overnight SOFR（区别于 Term SOFR 3M → sofr 字段）
+    v = _get("SOFR"); result["sofr_on"] = v if v is not None else None
+    # IORB
+    v = _get("IORB"); result["iorb"] = v if v is not None else None
+    # EFFR
+    v = _get("FEDFUNDS"); result["effr"] = v if v is not None else None
+    # DW 贴现窗口（B）
+    v = _get("DPCREDIT"); result["dw"] = v if v is not None else None
+    # SRF（H.4.1 HTML parse）
+    result["srf"] = _fetch_srf()
+    # 衍生：SOFR-IORB 利差
+    if result.get("sofr_on") is not None and result.get("iorb") is not None:
+        result["sofr_iorb_bp"] = round((result["sofr_on"] - result["iorb"]) * 100, 1)
+
+    return {k: v for k, v in result.items() if v is not None}
+
+
+def _fetch_srf() -> float:
+    """解析 Fed H.4.1，返回 SRF 使用量（十亿美元）；失败或未使用则返回 0.0。"""
+    try:
+        from bs4 import BeautifulSoup
+        r = requests.get(
+            "https://www.federalreserve.gov/releases/h41/current/h41.htm",
+            timeout=25, headers={"User-Agent": "Mozilla/5.0 (compatible)"}
+        )
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        for row in soup.find_all("tr"):
+            cells = row.find_all(["td", "th"])
+            if not cells:
+                continue
+            label = cells[0].get_text(" ", strip=True).lower()
+            if "standing" in label and "repo" in label:
+                for c in cells[1:]:
+                    txt = c.get_text(strip=True).replace(",", "").replace("\xa0", "")
+                    if txt and txt not in ("-", "n.a.", "ND"):
+                        try:
+                            return round(float(txt) / 1000, 3)
+                        except ValueError:
+                            continue
+        return 0.0
+    except Exception:
+        return 0.0
+
+
+# ────────────────────────────────────────────────────────────────────
+# ④ ETF 收盘价
 # ────────────────────────────────────────────────────────────────────
 def fetch_etf_prices() -> dict:
     result = {}
@@ -177,9 +276,11 @@ def backfill_yields_history(history: list) -> list:
     以及月频 IRLTLT01CNM156N（中国10Y），填充到 history 中。
     仅在 us_2y 字段不足 60 条时触发（幂等）。
     """
-    has_us2y = sum(1 for r in history if r.get("us_2y") is not None)
-    has_cnus  = sum(1 for r in history if r.get("cnus_fred") is not None)
-    if has_us2y >= 60 and has_cnus >= 60:
+    has_us2y    = sum(1 for r in history if r.get("us_2y") is not None)
+    has_cnus    = sum(1 for r in history if r.get("cnus_fred") is not None)
+    has_iorb    = sum(1 for r in history if r.get("iorb") is not None)
+    has_reserves = sum(1 for r in history if r.get("reserves") is not None)
+    if has_us2y >= 60 and has_cnus >= 60 and has_iorb >= 60 and has_reserves >= 60:
         return history
 
     api_key = os.environ.get("FRED_API_KEY", "")
@@ -189,13 +290,17 @@ def backfill_yields_history(history: list) -> list:
 
     print("\n── 收益率曲线历史回填 (90d) ─────────────────────────────")
 
-    # 日频序列
+    # 日频序列（收益率曲线 + 流动性）
     daily_map = {
         "us_2y":        "DGS2",
         "us_10y":       "DGS10",
         "spread_2y10y": "T10Y2Y",
         "spread_3m10y": "T10Y3M",
         "bei_10y":      "T10YIE",
+        "sofr_on":      "SOFR",
+        "iorb":         "IORB",
+        "effr":         "FEDFUNDS",
+        "onrrp":        "RRPONTSYD",
     }
     all_obs: dict = {}   # {date: {field: value}}
     for field, sid in daily_map.items():
@@ -204,6 +309,20 @@ def backfill_yields_history(history: list) -> list:
             for d, v in obs.items():
                 all_obs.setdefault(d, {})[field] = v
             print(f"   {sid}: {len(obs)} 条")
+        except Exception as e:
+            print(f"   {sid} ERROR: {e}")
+
+    # 周频序列（需 forward-fill）
+    weekly_map = {
+        "reserves": ("WRESBAL",  1000),   # M → T
+        "dw":       ("DPCREDIT", 1),      # 已是 B
+    }
+    weekly_raw: dict = {}   # {field: {date: value}}
+    for field, (sid, div) in weekly_map.items():
+        try:
+            obs = _fred_series_90d(sid, api_key, days=120)
+            weekly_raw[field] = {d: round(v / div, 3) for d, v in obs.items()}
+            print(f"   {sid}: {len(obs)} 条（周频）")
         except Exception as e:
             print(f"   {sid} ERROR: {e}")
 
@@ -218,23 +337,38 @@ def backfill_yields_history(history: list) -> list:
     # 所有日期轴（合并 history 日期 + 抓取日期）
     all_dates = sorted(set(list(all_obs.keys()) + [r["date"] for r in history]))
 
-    # Forward-fill 月频 CN10Y 到每个日期
-    cn10y_ff: dict = {}
-    last_cn = None
-    for d in all_dates:
-        if d in cn10y_dict:
-            last_cn = cn10y_dict[d]
-        cn10y_ff[d] = last_cn
+    def _ffill_dict(raw: dict, dates: list) -> dict:
+        out, last = {}, None
+        for d in dates:
+            if d in raw:
+                last = raw[d]
+            out[d] = last
+        return out
 
-    # 把 cn10y_fred / cnus_fred 写入 all_obs
+    # Forward-fill 月频 CN10Y
+    cn10y_ff = _ffill_dict(cn10y_dict, all_dates)
+    # Forward-fill 周频序列
+    weekly_ff = {field: _ffill_dict(raw, all_dates) for field, raw in weekly_raw.items()}
+
+    # 把衍生字段写入 all_obs
     for d in all_dates:
         if d not in all_obs:
-            continue
+            all_obs[d] = {}
+        # 周频 forward-fill
+        for field, ff in weekly_ff.items():
+            if ff.get(d) is not None and all_obs[d].get(field) is None:
+                all_obs[d][field] = ff[d]
+        # CN10Y + CNUS_FRED
         us10y = all_obs[d].get("us_10y")
         cn = cn10y_ff.get(d)
         if us10y is not None and cn is not None:
             all_obs[d]["cn10y_fred"] = round(cn, 3)
             all_obs[d]["cnus_fred"]  = round(us10y - cn, 3)
+        # SOFR-IORB bp
+        sofr_on = all_obs[d].get("sofr_on")
+        iorb    = all_obs[d].get("iorb")
+        if sofr_on is not None and iorb is not None:
+            all_obs[d]["sofr_iorb_bp"] = round((sofr_on - iorb) * 100, 1)
 
     # 合并进 history（只补缺失字段，不覆盖已有值）
     existing = {r["date"]: i for i, r in enumerate(history)}
@@ -580,8 +714,13 @@ def update_index_html(history: list) -> bool:
     sp_3m10y_arr = _ffill("spread_3m10y")
     bei_arr      = _ffill("bei_10y")
     tips_arr     = _ffill("tips_10y")
-    cn10y_fred_arr = _ffill("cn10y_fred")
-    cnus_fred_arr  = _ffill("cnus_fred")
+    cn10y_fred_arr  = _ffill("cn10y_fred")
+    cnus_fred_arr   = _ffill("cnus_fred")
+    sofr_iorb_arr   = _ffill("sofr_iorb_bp")
+    wresbal_arr     = _ffill("reserves")
+    dw_arr          = _ffill("dw")
+    onrrp_arr       = _ffill("onrrp")
+    tga_arr         = _ffill("tga")
 
     today_str = date.today().isoformat()
 
@@ -609,7 +748,12 @@ def update_index_html(history: list) -> bool:
         f"const BEI10Y={json.dumps(bei_arr)};\n"
         f"const TIPS10Y={json.dumps(tips_arr)};\n"
         f"const CN10Y_FRED={json.dumps(cn10y_fred_arr)};\n"
-        f"const CNUS_FRED={json.dumps(cnus_fred_arr)};\n\n"
+        f"const CNUS_FRED={json.dumps(cnus_fred_arr)};\n"
+        f"const SOFR_IORB={json.dumps(sofr_iorb_arr)};\n"
+        f"const WRESBAL={json.dumps(wresbal_arr)};\n"
+        f"const DW_ARR={json.dumps(dw_arr)};\n"
+        f"const ONRRP={json.dumps(onrrp_arr)};\n"
+        f"const TGA_ARR={json.dumps(tga_arr)};\n\n"
         f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
         f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
         f"etf3110:[...ETF3110],ratio:[...RATIO],cnusSpread:[...CNUS],"
@@ -617,7 +761,10 @@ def update_index_html(history: list) -> bool:
         f"brentWti:[...BWTI],vix:[...VIX_ARR],wtiPx:[...WTI_PX],"
         f"us2y:[...US2Y],us10y:[...US10Y],sp2y10y:[...SP2Y10Y],"
         f"sp3m10y:[...SP3M10Y],bei10y:[...BEI10Y],tips10y:[...TIPS10Y],"
-        f"cn10yFred:[...CN10Y_FRED],cnusFred:[...CNUS_FRED]}};"
+        f"tips:[...TIPS10Y],"
+        f"cn10yFred:[...CN10Y_FRED],cnusFred:[...CNUS_FRED],"
+        f"sofrIorb:[...SOFR_IORB],wresbal:[...WRESBAL],dw:[...DW_ARR],"
+        f"onrrp:[...ONRRP],tga:[...TGA_ARR]}};"
     )
 
     html = INDEX_HTML.read_text(encoding="utf-8")
@@ -884,8 +1031,26 @@ def main():
         else:
             errors.append("SOFR")
 
-    # ── ③ ETF ────────────────────────────────────────────────────────
-    print("\n③ ETF 收盘价")
+    # ── ③ 美元流动性底层指标 ─────────────────────────────────────────────
+    print("\n③ 美元流动性底层指标")
+    try:
+        liq = fetch_liq_bundle()
+        for k, v in liq.items():
+            record[k] = v
+        parts = []
+        if "sofr_iorb_bp" in liq: parts.append(f"SOFR-IORB={liq['sofr_iorb_bp']:+.1f}bp")
+        if "reserves"     in liq: parts.append(f"WRESBAL={liq['reserves']:.3f}T")
+        if "dw"           in liq: parts.append(f"DW={liq['dw']:.2f}B")
+        if "onrrp"        in liq: parts.append(f"ONRRP={liq['onrrp']:.1f}B")
+        if "tga"          in liq: parts.append(f"TGA={liq['tga']:.3f}T")
+        if "srf"          in liq: parts.append(f"SRF={liq['srf']:.3f}B")
+        print(f"   {'  '.join(parts)}  ✓" if parts else "   (部分字段获取失败)")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        errors.append("LIQ_BUNDLE")
+
+    # ── ④ ETF ────────────────────────────────────────────────────────
+    print("\n④ ETF 收盘价")
     try:
         etfs = fetch_etf_prices()
         record["etf3033"] = etfs["3033.HK"]["close"]
