@@ -19,11 +19,18 @@ import os
 import sys
 import json
 import re
+import io
+import csv
+import zipfile
 import requests
 import yfinance as yf
 import akshare as ak
 from datetime import date
 from pathlib import Path
+
+# WTI期货月份代码 (CME/NYMEX)
+_FUT_MONTHS = {1:'F',2:'G',3:'H',4:'J',5:'K',6:'M',
+               7:'N',8:'Q',9:'U',10:'V',11:'X',12:'Z'}
 
 # Windows 终端 UTF-8 兼容
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
@@ -88,90 +95,6 @@ def fetch_sofr_3m() -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────
-# ②b SOFR Spot  (FRED: SOFR)
-# ────────────────────────────────────────────────────────────────────
-def fetch_sofr_spot() -> dict:
-    api_key = os.environ.get("FRED_API_KEY", "")
-    if not api_key:
-        raise EnvironmentError("FRED_API_KEY not set")
-    params = {
-        "series_id":  "SOFR",
-        "api_key":    api_key,
-        "file_type":  "json",
-        "sort_order": "desc",
-        "limit":      "5",
-    }
-    r = requests.get(
-        "https://api.stlouisfed.org/fred/series/observations",
-        params=params, timeout=15,
-    )
-    r.raise_for_status()
-    for obs in r.json().get("observations", []):
-        if obs["value"] != ".":
-            return {"date": obs["date"], "rate": float(obs["value"])}
-    raise ValueError("FRED SOFR 无有效数据")
-
-
-# ────────────────────────────────────────────────────────────────────
-# ②c Term SOFR 6M  (FRED: SOFR180DAYAVG, fallback SR6M)
-# ────────────────────────────────────────────────────────────────────
-def fetch_sofr_6m() -> dict:
-    api_key = os.environ.get("FRED_API_KEY", "")
-    if not api_key:
-        raise EnvironmentError("FRED_API_KEY not set")
-    for series_id in ["SOFR180DAYAVG", "SR6M"]:
-        params = {
-            "series_id":  series_id,
-            "api_key":    api_key,
-            "file_type":  "json",
-            "sort_order": "desc",
-            "limit":      "5",
-        }
-        try:
-            r = requests.get(
-                "https://api.stlouisfed.org/fred/series/observations",
-                params=params, timeout=15,
-            )
-            r.raise_for_status()
-            for obs in r.json().get("observations", []):
-                if obs["value"] != ".":
-                    return {"date": obs["date"], "rate": float(obs["value"]), "series": series_id}
-        except Exception:
-            continue
-    raise ValueError("FRED SOFR180DAYAVG/SR6M 无有效数据")
-
-# helper
-def _fred_latest(series_id: str) -> tuple:
-    api_key = os.environ.get("FRED_API_KEY", "")
-    if not api_key:
-        raise EnvironmentError("FRED_API_KEY not set")
-    params = {"series_id": series_id, "api_key": api_key, "file_type": "json",
-              "sort_order": "desc", "limit": "10"}
-    r = requests.get("https://api.stlouisfed.org/fred/series/observations",
-                     params=params, timeout=15)
-    r.raise_for_status()
-    for obs in r.json().get("observations", []):
-        if obs["value"] not in (".", ""):
-            return obs["date"], float(obs["value"])
-    raise ValueError(f"FRED {series_id} 无数据")
-
-
-def fetch_iorb() -> dict:
-    d, v = _fred_latest("IORB"); return {"date": d, "rate": v}
-
-def fetch_wresbal() -> dict:
-    d, v = _fred_latest("WRESBAL"); return {"date": d, "value_t": round(v/1000, 3)}
-
-def fetch_dw() -> dict:
-    d, v = _fred_latest("DPCREDIT"); return {"date": d, "value_bn": round(v/1000, 3)}
-
-def fetch_tips_10y() -> dict:
-    d, v = _fred_latest("DFII10"); return {"date": d, "rate": v}
-
-
-
-
-# ────────────────────────────────────────────────────────────────────
 # ③ ETF 收盘价
 # ────────────────────────────────────────────────────────────────────
 def fetch_etf_prices() -> dict:
@@ -188,8 +111,256 @@ def fetch_etf_prices() -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────
+# ETF 历史回填（history 条数不足 60 时自动执行）
+# ────────────────────────────────────────────────────────────────────
+def backfill_etf_history(history: list) -> list:
+    """
+    用 yfinance 拉取 3033.HK / 3110.HK 近 3 个月日收盘价，
+    回填到 history 中已存在的日期（补充缺失字段），
+    以及创建尚未存在的日期记录。
+    仅在 history < 60 条时执行（避免每日重复抓取）。
+    """
+    if len(history) >= 60:
+        return history
+
+    print("\n── ETF 历史回填 (3mo) ─────────────────────────────────")
+    etf_rows: dict = {}   # {date_str: {"etf3033": float, "etf3110": float}}
+    for ticker in ["3033.HK", "3110.HK"]:
+        field = "etf3033" if "3033" in ticker else "etf3110"
+        try:
+            h = yf.Ticker(ticker).history(period="3mo")
+            if h.empty:
+                h = yf.download(ticker, start="2026-01-01", progress=False,
+                                auto_adjust=True)
+                # yf.download 可能返回 MultiIndex 列
+                if not h.empty and hasattr(h.columns, "levels"):
+                    h.columns = h.columns.droplevel(1)
+            if h.empty:
+                print(f"   {ticker}: 无数据，跳过")
+                continue
+            for dt, row in h.iterrows():
+                d = str(dt.date())
+                etf_rows.setdefault(d, {})[field] = round(float(row["Close"]), 4)
+            print(f"   {ticker}: 取得 {len(h)} 条  ✓")
+        except Exception as e:
+            print(f"   {ticker}: ERROR {e}")
+
+    existing = {r["date"]: i for i, r in enumerate(history)}
+    added, updated = 0, 0
+    for d, fields in sorted(etf_rows.items()):
+        if d in existing:
+            rec = history[existing[d]]
+            for k, v in fields.items():
+                if k not in rec:          # 只补缺失字段，不覆盖已有数据
+                    rec[k] = v
+                    updated += 1
+        elif len(fields) == 2:            # 两个ETF都有数据才建新记录
+            history.append({"date": d, **fields})
+            added += 1
+
+    history.sort(key=lambda r: r["date"])
+    history = history[-MAX_HIST_DAYS:]
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"  ETF 回填：新增 {added} 条 / 补字段 {updated} 处，共 {len(history)} 条")
+    return history
+
+
+# ────────────────────────────────────────────────────────────────────
 # ④ 南向资金
 # ────────────────────────────────────────────────────────────────────
+# ⑤ 中美利差 10Y  (CN via akshare, US via FRED DGS10)
+# ────────────────────────────────────────────────────────────────────
+def fetch_cn_us_spread() -> dict:
+    from datetime import timedelta
+
+    # US 10Y from FRED DGS10
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("FRED_API_KEY not set")
+    params = {
+        "series_id":  "DGS10",
+        "api_key":    api_key,
+        "file_type":  "json",
+        "sort_order": "desc",
+        "limit":      "5",
+    }
+    r = requests.get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params=params, timeout=15,
+    )
+    r.raise_for_status()
+    us10y = None
+    for obs in r.json().get("observations", []):
+        if obs["value"] != ".":
+            us10y = float(obs["value"])
+            break
+    if us10y is None:
+        raise ValueError("FRED DGS10 无有效数据")
+
+    # CN 10Y from akshare bond_zh_us_rate
+    start = (date.today() - timedelta(days=30)).strftime("%Y%m%d")
+    df = ak.bond_zh_us_rate(start_date=start)
+    cn_col = next((c for c in df.columns if "中国" in c and "10年" in c), None)
+    if cn_col is None:
+        raise ValueError("akshare bond_zh_us_rate 无中国10年列")
+    df = df.dropna(subset=[cn_col])
+    if df.empty:
+        raise ValueError("akshare CN 10Y 无有效数据")
+    cn10y = float(df.iloc[-1][cn_col])
+
+    return {
+        "cn10y":     cn10y,
+        "us10y":     us10y,
+        "spread_bp": round((cn10y - us10y) * 100, 2),
+    }
+
+
+# ────────────────────────────────────────────────────────────────────
+# ⑥ CFTC 原油投机净多仓（Managed Money，Legacy COT）
+# ────────────────────────────────────────────────────────────────────
+def fetch_cftc_crude() -> dict:
+    year = date.today().year
+    url = f"https://www.cftc.gov/files/dea/history/deacot{year}.zip"
+    r = requests.get(url, timeout=60,
+                     headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        content = z.read(z.namelist()[0]).decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(content))
+    crude_rows = []
+    for row in reader:
+        name = row.get("Market and Exchange Names",
+                       row.get("Market_and_Exchange_Names", ""))
+        if "CRUDE OIL" in name.upper() and "LIGHT SWEET" in name.upper():
+            crude_rows.append(row)
+
+    if len(crude_rows) < 2:
+        raise ValueError(f"CFTC原油数据不足: {len(crude_rows)}行")
+
+    # 按日期排序
+    date_key = next((k for k in crude_rows[0] if "date" in k.lower()), None)
+    if date_key:
+        crude_rows.sort(key=lambda x: x.get(date_key, ""))
+
+    def _net(row):
+        lk = next((k for k in ("Noncommercial Positions-Long (All)",
+                                "NonComm_Positions_Long_All") if k in row), None)
+        sk = next((k for k in ("Noncommercial Positions-Short (All)",
+                                "NonComm_Positions_Short_All") if k in row), None)
+        lng = int((row.get(lk) or "0").replace(",", "")) if lk else 0
+        sht = int((row.get(sk) or "0").replace(",", "")) if sk else 0
+        return lng - sht
+
+    latest, prev = crude_rows[-1], crude_rows[-2]
+    net_now, net_prev = _net(latest), _net(prev)
+    return {
+        "date":     latest.get(date_key, "") if date_key else "",
+        "net_long": net_now,
+        "chg":      net_now - net_prev,
+    }
+
+
+# ────────────────────────────────────────────────────────────────────
+# ⑦ WTI 1-5月差（yfinance CME合约）
+# ────────────────────────────────────────────────────────────────────
+def fetch_wti_spread() -> dict:
+    m, y = date.today().month, date.today().year
+    syms = []
+    for _ in range(9):
+        syms.append(f"CL{_FUT_MONTHS[m]}{str(y)[2:]}.NYM")
+        m = m % 12 + 1
+        if m == 1:
+            y += 1
+
+    prices = {}
+    for sym in syms:
+        try:
+            h = yf.Ticker(sym).history(period="3d")
+            if not h.empty:
+                prices[sym] = round(float(h["Close"].iloc[-1]), 2)
+        except Exception:
+            pass
+
+    valid = list(prices.values())
+    if len(valid) < 5:
+        raise ValueError(f"WTI期货合约不足5个: {len(valid)}")
+    front, m5 = valid[0], valid[4]
+    return {"front": front, "m5": m5, "spread": round(front - m5, 2)}
+
+
+# ────────────────────────────────────────────────────────────────────
+# ⑧ Brent−WTI 价差（yfinance）
+# ────────────────────────────────────────────────────────────────────
+def fetch_brent_wti() -> dict:
+    brent = yf.Ticker("BZ=F").history(period="5d")
+    wti   = yf.Ticker("CL=F").history(period="5d")
+    if brent.empty or wti.empty:
+        raise ValueError("yfinance Brent/WTI 返回空数据")
+    b = round(float(brent["Close"].iloc[-1]), 2)
+    w = round(float(wti["Close"].iloc[-1]), 2)
+    return {"brent": b, "wti": w, "spread": round(b - w, 2)}
+
+
+# ────────────────────────────────────────────────────────────────────
+# ⑨ VIX 指数（yfinance）
+# ────────────────────────────────────────────────────────────────────
+def fetch_vix() -> dict:
+    h = yf.Ticker("^VIX").history(period="5d")
+    if h.empty:
+        raise ValueError("yfinance ^VIX 返回空数据")
+    return {"vix": round(float(h["Close"].iloc[-1]), 2)}
+
+
+# ────────────────────────────────────────────────────────────────────
+# ─ FRED 单序列辅助：取最新非空值
+# ────────────────────────────────────────────────────────────────────
+def _fred_latest(series_id: str, api_key: str) -> float:
+    params = {
+        "series_id": series_id, "api_key": api_key,
+        "file_type": "json", "sort_order": "desc", "limit": "10",
+    }
+    r = requests.get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params=params, timeout=15,
+    )
+    r.raise_for_status()
+    for obs in r.json().get("observations", []):
+        if obs["value"] != ".":
+            return float(obs["value"])
+    raise ValueError(f"FRED {series_id} 无有效数据")
+
+
+# ────────────────────────────────────────────────────────────────────
+# ⑩ 美债收益率曲线（FRED 批量）
+#    DGS2    → us_2y
+#    DGS10   → us_10y
+#    T10Y2Y  → spread_2y10y  (%)
+#    T10Y3M  → spread_3m10y  (%)
+#    T10YIE  → bei_10y       (%)
+#    DFII10  → tips_10y      (%)
+# ────────────────────────────────────────────────────────────────────
+def fetch_us_yields() -> dict:
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        raise EnvironmentError("FRED_API_KEY not set")
+    series_map = [
+        ("us_2y",        "DGS2"),
+        ("us_10y",       "DGS10"),
+        ("spread_2y10y", "T10Y2Y"),
+        ("spread_3m10y", "T10Y3M"),
+        ("bei_10y",      "T10YIE"),
+        ("tips_10y",     "DFII10"),
+    ]
+    result = {}
+    for field, sid in series_map:
+        result[field] = _fred_latest(sid, api_key)
+    return result
+
+
 def fetch_southbound() -> dict:
     df = ak.stock_hsgt_hist_em(symbol="南向资金")
     if df.empty:
@@ -245,28 +416,33 @@ def update_index_html(history: list) -> bool:
     rows = history[-MAX_CHART_DAYS:]
     n    = len(rows)
 
-    # SOFR/SOFR6M/远期价差 缺失时向前填充
-    last_sofr = 0.0; last_sofr6m = 0.0; last_spot = 0.0
-    last_sofr_iorb = None; last_wresbal = None; last_dw = None; last_tips = None
-    sofrs = []; sofr6ms = []; fwd1x3s = []; fwd3x6s = []
-    sofr_iorbs = []; wresbals = []; dws = []; tips_arr = []
+    # SOFR 缺失时向前填充
+    last_sofr = 0.0
+    sofrs = []
     for r in rows:
-        if r.get("sofr") is not None:       last_sofr      = r["sofr"]
-        if r.get("sofr6m") is not None:     last_sofr6m    = r["sofr6m"]
-        if r.get("sofr_spot") is not None:  last_spot      = r["sofr_spot"]
-        if r.get("sofr_iorb") is not None:  last_sofr_iorb = r["sofr_iorb"]
-        if r.get("wresbal") is not None:    last_wresbal   = r["wresbal"]
-        if r.get("dw") is not None:         last_dw        = r["dw"]
-        if r.get("tips_10y") is not None:   last_tips      = r["tips_10y"]
+        v = r.get("sofr")
+        if v is not None:
+            last_sofr = v
         sofrs.append(last_sofr)
-        sofr6ms.append(last_sofr6m)
-        s3 = last_sofr; s6 = last_sofr6m; sp = last_spot
-        fwd1x3s.append(round((s3 - sp) * 100, 2) if sp else None)
-        fwd3x6s.append(round((s6 - s3) * 100, 2) if s6 else None)
-        sofr_iorbs.append(last_sofr_iorb)
-        wresbals.append(last_wresbal)
-        dws.append(last_dw)
-        tips_arr.append(last_tips)
+
+    # 中美利差缺失时向前填充
+    last_cnus = None
+    cnus_list = []
+    for r in rows:
+        v = r.get("cnus_bp")
+        if v is not None:
+            last_cnus = v
+        cnus_list.append(last_cnus)
+
+    def _ffill(key):
+        last = None
+        out = []
+        for r in rows:
+            v = r.get(key)
+            if v is not None:
+                last = v
+            out.append(last)
+        return out
 
     dates   = [r["date"]                         for r in rows]
     hibors  = [r["hibor"]                         for r in rows]
@@ -275,6 +451,19 @@ def update_index_html(history: list) -> bool:
     etf3033 = [r["etf3033"]                       for r in rows]
     etf3110 = [r["etf3110"]                       for r in rows]
     ratios  = [round(etf3033[i] / etf3110[i], 4) if etf3110[i] else 0.0 for i in range(n)]
+
+    cftc_net     = _ffill("cftc_net")
+    cftc_chg     = _ffill("cftc_chg")
+    wti_m15      = _ffill("wti_m15")
+    brent_wti    = _ffill("brent_wti")
+    vix_arr      = _ffill("vix")
+    wti_px       = _ffill("wti_price")
+    us_2y_arr    = _ffill("us_2y")
+    us_10y_arr   = _ffill("us_10y")
+    sp_2y10y_arr = _ffill("spread_2y10y")
+    sp_3m10y_arr = _ffill("spread_3m10y")
+    bei_arr      = _ffill("bei_10y")
+    tips_arr     = _ffill("tips_10y")
 
     today_str = date.today().isoformat()
 
@@ -288,18 +477,26 @@ def update_index_html(history: list) -> bool:
         f"const ETF3033={json.dumps(etf3033)};\n"
         f"const ETF3110={json.dumps(etf3110)};\n"
         f"const RATIO={json.dumps(ratios)};\n"
-        f"const SOFR6M={json.dumps(sofr6ms)};\n"
-        f"const FWD1X3={json.dumps(fwd1x3s)};\n"
-        f"const FWD3X6={json.dumps(fwd3x6s)};\n"
-        f"const SOFR_IORB={json.dumps(sofr_iorbs)};\n"
-        f"const WRESBAL={json.dumps(wresbals)};\n"
-        f"const DW={json.dumps(dws)};\n"
+        f"const CNUS  ={json.dumps(cnus_list)};\n"
+        f"const CFTC_NET={json.dumps(cftc_net)};\n"
+        f"const CFTC_CHG={json.dumps(cftc_chg)};\n"
+        f"const WTI_M15={json.dumps(wti_m15)};\n"
+        f"const BWTI  ={json.dumps(brent_wti)};\n"
+        f"const VIX_ARR={json.dumps(vix_arr)};\n"
+        f"const WTI_PX={json.dumps(wti_px)};\n"
+        f"const US2Y  ={json.dumps(us_2y_arr)};\n"
+        f"const US10Y ={json.dumps(us_10y_arr)};\n"
+        f"const SP2Y10Y={json.dumps(sp_2y10y_arr)};\n"
+        f"const SP3M10Y={json.dumps(sp_3m10y_arr)};\n"
+        f"const BEI10Y={json.dumps(bei_arr)};\n"
         f"const TIPS10Y={json.dumps(tips_arr)};\n\n"
         f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
         f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
-        f"etf3110:[...ETF3110],ratio:[...RATIO],"
-        f"sofr6m:[...SOFR6M],fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6],"
-        f"sofrIorb:[...SOFR_IORB],wresbal:[...WRESBAL],dw:[...DW],tips:[...TIPS10Y]}};"
+        f"etf3110:[...ETF3110],ratio:[...RATIO],cnusSpread:[...CNUS],"
+        f"cftcNet:[...CFTC_NET],cftcChg:[...CFTC_CHG],wtiM15:[...WTI_M15],"
+        f"brentWti:[...BWTI],vix:[...VIX_ARR],wtiPx:[...WTI_PX],"
+        f"us2y:[...US2Y],us10y:[...US10Y],sp2y10y:[...SP2Y10Y],"
+        f"sp3m10y:[...SP3M10Y],bei10y:[...BEI10Y],tips10y:[...TIPS10Y]}};"
     )
 
     html = INDEX_HTML.read_text(encoding="utf-8")
@@ -540,7 +737,14 @@ def main():
         print(f"   {h['rate']:.4f}%  ({h['date']})  变动 {h['change_pct']:+.3f}%  ✓")
     except Exception as e:
         print(f"   ERROR: {e}")
-        errors.append("HIBOR")
+        # 向前填充：用 history.json 最近一条有效 hibor
+        hist_tmp = load_history()
+        last = next((r["hibor"] for r in reversed(hist_tmp) if r.get("hibor")), None)
+        if last:
+            record["hibor"] = last
+            print(f"   使用上次已知值 {last:.4f}%（填充）")
+        else:
+            errors.append("HIBOR")
 
     # ── ② SOFR ───────────────────────────────────────────────────────
     print("\n② Term SOFR 3M (FRED: SOFR90DAYAVG)")
@@ -558,34 +762,6 @@ def main():
             print(f"   使用上次已知值 {last:.4f}%（填充）")
         else:
             errors.append("SOFR")
-
-    # ── ②b SOFR Spot ─────────────────────────────────────────────────
-    print("\n②b SOFR 现货 (FRED: SOFR)")
-    try:
-        ss = fetch_sofr_spot()
-        record["sofr_spot"] = ss["rate"]
-        print(f"   {ss['rate']:.4f}%  ({ss['date']})  ✓")
-    except Exception as e:
-        print(f"   ERROR: {e}")
-        hist_tmp = load_history()
-        last = next((r["sofr_spot"] for r in reversed(hist_tmp) if r.get("sofr_spot")), None)
-        if last:
-            record["sofr_spot"] = last
-            print(f"   使用上次已知值 {last:.4f}%（填充）")
-
-    # ── ②c SOFR 6M ───────────────────────────────────────────────────
-    print("\n②c Term SOFR 6M (FRED: SOFR180DAYAVG)")
-    try:
-        s6 = fetch_sofr_6m()
-        record["sofr6m"] = s6["rate"]
-        print(f"   {s6['rate']:.4f}%  ({s6['date']})  [{s6['series']}]  ✓")
-    except Exception as e:
-        print(f"   ERROR: {e}")
-        hist_tmp = load_history()
-        last = next((r["sofr6m"] for r in reversed(hist_tmp) if r.get("sofr6m")), None)
-        if last:
-            record["sofr6m"] = last
-            print(f"   使用上次已知值 {last:.4f}%（填充）")
 
     # ── ③ ETF ────────────────────────────────────────────────────────
     print("\n③ ETF 收盘价")
@@ -611,52 +787,112 @@ def main():
         print(f"   ERROR: {e}")
         errors.append("南向资金")
 
-    # ── ⑤ IORB -> SOFR-IORB ─────────────────────────────────────────
-    print("\n⑤ IORB (FRED: IORB)")
+    # ── ⑤ 中美利差 10Y CN−US ────────────────────────────────────────
+    print("\n⑤ 中美利差 10Y CN−US")
     try:
-        iorb_d   = fetch_iorb()
-        iorb_val = iorb_d["rate"]
-        record["iorb"] = iorb_val
-        sofr_spot_v = record.get("sofr_spot")
-        if sofr_spot_v is not None:
-            sib = round((sofr_spot_v - iorb_val) * 100, 2)
-            record["sofr_iorb"] = sib
-            sig = "准备金充裕" if sib < 5 else ("开始分化" if sib < 10 else "压力信号")
-            print(f"   IORB={iorb_val:.3f}%  SOFR-IORB={sib:+.1f}bp -> {sig}  ok")
+        cnus = fetch_cn_us_spread()
+        record["cnus_bp"] = cnus["spread_bp"]
+        print(f"   CN {cnus['cn10y']:.3f}%  US {cnus['us10y']:.3f}%"
+              f"  利差 {cnus['spread_bp']:+.1f}bp  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["cnus_bp"] for r in reversed(hist_tmp) if r.get("cnus_bp") is not None), None)
+        if last is not None:
+            record["cnus_bp"] = last
+            print(f"   使用上次已知值 {last:+.1f}bp（填充）")
         else:
-            print(f"   IORB={iorb_val:.3f}% (sofr_spot 缺失)")
-    except Exception as e:
-        print(f"   ERROR: {e}")
+            print("   无历史数据，跳过（非必要字段）")
 
-    # ── ⑥ 银行准备金 WRESBAL ─────────────────────────────────────────
-    print("\n⑥ 银行准备金 (FRED: WRESBAL)")
+    # ── ⑥ CFTC 原油投机净多仓 ──────────────────────────────────────────
+    print("\n⑥ CFTC 原油投机净多仓（Legacy COT）")
     try:
-        w = fetch_wresbal()
-        record["wresbal"] = w["value_t"]
-        sig = "理想" if w["value_t"] > 3.0 else ("警戒" if w["value_t"] > 2.9 else "危险")
-        print(f"   {w['value_t']:.3f}T  ({w['date']})  -> {sig}  ok")
+        cftc = fetch_cftc_crude()
+        record["cftc_net"] = cftc["net_long"]
+        record["cftc_chg"] = cftc["chg"]
+        sign = "+" if cftc["chg"] >= 0 else ""
+        print(f"   净多仓 {cftc['net_long']:,}  WoW {sign}{cftc['chg']:,}"
+              f"  ({cftc['date']})  ✓")
     except Exception as e:
         print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in ("cftc_net", "cftc_chg"):
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+                print(f"   {fld} 使用上次已知值 {last}（填充）")
 
-    # ── ⑦ 贴现窗口 DW ────────────────────────────────────────────────
-    print("\n⑦ 贴现窗口 (FRED: DPCREDIT)")
+    # ── ⑦ WTI 1-5月差 ─────────────────────────────────────────────────
+    print("\n⑦ WTI 1-5月差（CME期货）")
     try:
-        dw_d = fetch_dw()
-        record["dw"] = dw_d["value_bn"]
-        sig = "正常" if dw_d["value_bn"] < 2 else ("警戒" if dw_d["value_bn"] < 5 else "危险")
-        print(f"   {dw_d['value_bn']:.3f}B  ({dw_d['date']})  -> {sig}  ok")
+        ws = fetch_wti_spread()
+        record["wti_m15"] = ws["spread"]
+        structure = "Backwardation" if ws["spread"] > 0 else "Contango"
+        print(f"   M1 ${ws['front']:.2f}  M5 ${ws['m5']:.2f}"
+              f"  差 {ws['spread']:+.2f}  {structure}  ✓")
     except Exception as e:
         print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["wti_m15"] for r in reversed(hist_tmp)
+                     if r.get("wti_m15") is not None), None)
+        if last is not None:
+            record["wti_m15"] = last
+            print(f"   使用上次已知值 {last:+.2f}（填充）")
 
-    # ── ⑧ 10Y TIPS ───────────────────────────────────────────────────
-    print("\n⑧ 10Y TIPS (FRED: DFII10)")
+    # ── ⑧ Brent−WTI 价差 ──────────────────────────────────────────────
+    print("\n⑧ Brent−WTI 价差")
     try:
-        t = fetch_tips_10y()
-        record["tips_10y"] = t["rate"]
-        sig = "利好黄金" if t["rate"] < 1.5 else ("压制估值" if t["rate"] > 2.0 else "中性")
-        print(f"   {t['rate']:.3f}%  ({t['date']})  -> {sig}  ok")
+        bwti = fetch_brent_wti()
+        record["brent_wti"] = bwti["spread"]
+        record["wti_price"] = bwti["wti"]
+        print(f"   Brent ${bwti['brent']:.2f}  WTI ${bwti['wti']:.2f}"
+              f"  差 {bwti['spread']:+.2f}  ✓")
     except Exception as e:
         print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in ("brent_wti", "wti_price"):
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+
+    # ── ⑨ VIX 指数 ────────────────────────────────────────────────────
+    print("\n⑨ VIX 指数")
+    try:
+        vix_d = fetch_vix()
+        record["vix"] = vix_d["vix"]
+        print(f"   VIX = {vix_d['vix']:.2f}  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["vix"] for r in reversed(hist_tmp)
+                     if r.get("vix") is not None), None)
+        if last is not None:
+            record["vix"] = last
+            print(f"   使用上次已知值 {last:.2f}（填充）")
+
+    # ── ⑩ 美债收益率曲线 ──────────────────────────────────────────────
+    print("\n⑩ 美债收益率曲线（FRED）")
+    _yield_fields = ("us_2y", "us_10y", "spread_2y10y", "spread_3m10y",
+                     "bei_10y", "tips_10y")
+    try:
+        uy = fetch_us_yields()
+        for fld in _yield_fields:
+            record[fld] = uy[fld]
+        print(f"   2Y {uy['us_2y']:.3f}%  10Y {uy['us_10y']:.3f}%"
+              f"  2Y10Y {uy['spread_2y10y']:+.3f}%"
+              f"  3M10Y {uy['spread_3m10y']:+.3f}%"
+              f"  BEI {uy['bei_10y']:.3f}%  TIPS {uy['tips_10y']:.3f}%  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in _yield_fields:
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+                print(f"   {fld} 使用上次已知值 {last:.3f}（填充）")
 
     # ── 利差 ─────────────────────────────────────────────────────────
     if "hibor" in record and "sofr" in record:
@@ -669,21 +905,6 @@ def main():
         ratio = round(record["etf3033"] / record["etf3110"], 4)
         print(f"  3033÷3110 比值  : {ratio:.4f}")
 
-    # ── SOFR 远期价差 ─────────────────────────────────────────────────
-    sofr3m_val    = record.get("sofr")
-    sofr_spot_val = record.get("sofr_spot")
-    sofr6m_val    = record.get("sofr6m")
-    if sofr3m_val is not None and sofr_spot_val is not None:
-        fwd_1x3 = round((sofr3m_val - sofr_spot_val) * 100, 2)
-        record["fwd_1x3_bp"] = fwd_1x3
-        sig = "预期升息" if fwd_1x3 > 10 else ("预期降息" if fwd_1x3 < -10 else "曲线平坦")
-        print(f"  1x3 远期价差    : {fwd_1x3:+.1f} bp  →  {sig}")
-    if sofr6m_val is not None and sofr3m_val is not None:
-        fwd_3x6 = round((sofr6m_val - sofr3m_val) * 100, 2)
-        record["fwd_3x6_bp"] = fwd_3x6
-        sig2 = "预期收紧" if fwd_3x6 > 10 else ("预期宽松" if fwd_3x6 < -10 else "曲线平坦")
-        print(f"  3x6 远期价差    : {fwd_3x6:+.1f} bp  →  {sig2}")
-
     # ── 必要字段检查 ─────────────────────────────────────────────────
     required = {"hibor", "etf3033", "etf3110"}
     if not required.issubset(record.keys()):
@@ -694,6 +915,7 @@ def main():
     # ── 写入 ─────────────────────────────────────────────────────────
     print("\n── 写入 ──────────────────────────────────────────────────")
     history = load_history()
+    history = backfill_etf_history(history)   # 不足 60 条时自动回填 ETF 历史
     history = save_history(history, record)
     update_index_html(history)
 
