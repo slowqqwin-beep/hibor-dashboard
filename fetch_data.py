@@ -445,11 +445,11 @@ def update_index_html(history: list) -> bool:
         return out
 
     dates   = [r["date"]                         for r in rows]
-    hibors  = [r["hibor"]                         for r in rows]
+    hibors  = _ffill("hibor")
     spreads = [round((hibors[i] - sofrs[i]) * 100, 2) for i in range(n)]
     souths  = [r.get("south", 0.0)               for r in rows]
-    etf3033 = [r["etf3033"]                       for r in rows]
-    etf3110 = [r["etf3110"]                       for r in rows]
+    etf3033 = _ffill("etf3033")
+    etf3110 = _ffill("etf3110")
     ratios  = [round(etf3033[i] / etf3110[i], 4) if etf3110[i] else 0.0 for i in range(n)]
 
     cftc_net     = _ffill("cftc_net")
