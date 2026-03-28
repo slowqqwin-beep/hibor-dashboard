@@ -363,23 +363,21 @@
 </div>
 <script>
 // ── 实时数据（fetch_liquidity.py 写入 2026-03-28）──
-const LIQ_DATES=["2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28"];
-const LIQ_ONRRP=[1.123, 0.777, 0.885, 0.992];
-const LIQ_RESERVES=[3019.995, 3019.995, 2993.955, 2993.955];
-const LIQ_TGA=[853.052, 853.052, 874.077, 874.077];
-const LIQ_TGA_WOW=[14.866, 14.866, 21.025, 21.025];
-const LIQ_SOFR=[3.63, 3.63, 3.64, 3.65];
-const LIQ_IORB=[3.65, 3.65, 3.65, 3.65];
-const LIQ_EFFR=[3.64, 3.64, 3.64, 3.64];
-const LIQ_SOFR90=[3.68561, 3.68561, 3.68538, 3.68416];
-const LIQ_SRF=[0.0, 0.0, 0.0, 0.0];
-const LIQ_DW=[3.75, 3.75, 3.75, 3.75];
-const LIQ_JPY=[-39796.4, -1417.6, -1377.6, -1249.2];
-const LIQ_HIBOR_SPREAD=[-134.25, -116.88, -115.42, -115.3];
-const LIQ_SOFR180=[null, 3.88149, 3.87855, 3.87567];
-const LIQ_FWD_3X6=[null, 19.59, 19.32, 19.15];
+const LIQ_DATES=["2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28"];
+const LIQ_ONRRP=[5.667, 6.485, 2.582, 4.582, 3.083, 3.28, 3.402, 3.277, 3.223, 2.003, 1.222, 3.506, 3.344, 2.058, 0.927, 1.489, 1.253, 1.103, 2.852, 9.629, 10.415, 1.785, 2.414, 1.748, 3.111, 1.306, 1.447, 1.048, 2.844, 0.377, 0.441, 0.856, 0.632, 0.496, 0.877, 0.917, 1.159, 3.796, 16.318, 0.627, 1.203, 0.877, 2.793, 1.512, 0.332, 0.278, 0.552, 0.137, 0.427, 0.582, 0.797, 0.698, 0.637, 0.822, 0.857, 1.123, 1.123, 0.777, 0.885, 0.992];
+const LIQ_RESERVES=[2957.41, 2957.41, 2957.41, 2996.379, 2996.379, 2996.379, 2996.379, 2996.379, 3049.63, 3049.63, 3049.63, 3049.63, 2954.903, 2954.903, 2954.903, 2954.903, 2954.903, 2901.6, 2901.6, 2901.6, 2901.6, 2901.6, 2925.17, 2925.17, 2925.17, 2925.17, 2925.17, 2939.557, 2939.557, 2939.557, 2939.557, 2949.804, 2949.804, 2949.804, 2949.804, 2949.804, 2965.765, 2965.765, 2965.765, 2965.765, 2965.765, 3015.531, 3015.531, 3015.531, 3015.531, 3015.531, 3037.665, 3037.665, 3037.665, 3037.665, 3037.665, 3019.995, 3019.995, 3019.995, 3019.995, 3019.995, 3019.995, 3019.995, 2993.955, 2993.955];
+const LIQ_TGA=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 853.052, 853.052, 874.077, 874.077];
+const LIQ_TGA_WOW=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 14.866, 14.866, 21.025, 21.025];
+const LIQ_SOFR=[3.75, 3.7, 3.66, 3.65, 3.64, 3.64, 3.64, 3.65, 3.64, 3.66, 3.65, 3.64, 3.63, 3.64, 3.65, 3.66, 3.66, 3.64, 3.65, 3.68, 3.69, 3.69, 3.65, 3.65, 3.64, 3.63, 3.65, 3.65, 3.65, 3.66, 3.71, 3.73, 3.67, 3.66, 3.66, 3.67, 3.67, 3.67, 3.68, 3.71, 3.7, 3.67, 3.66, 3.65, 3.65, 3.64, 3.64, 3.65, 3.65, 3.7, 3.65, 3.62, 3.62, 3.62, 3.62, 3.63, 3.63, 3.63, 3.64, 3.65];
+const LIQ_IORB=[3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65, 3.65];
+const LIQ_EFFR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 3.64, 3.64, 3.64, 3.64];
+const LIQ_SOFR90=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 3.68561, 3.68561, 3.68538, 3.68416];
+const LIQ_SRF=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 0.0, 0.0, 0.0, 0.0];
+const LIQ_DW=[3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75, 3.75];
+const LIQ_JPY=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, -39796.4, -1417.6, -1377.6, -1249.2];
+const LIQ_HIBOR_SPREAD=[-119.17, -117.33, -99.37, -100.66, -97.86, -105.56, -106.1, -111.07, -113.69, -102.6, -106.19, -104.44, -106.11, -98.13, -99.52, -100.37, -100.49, -100.68, -101.85, -100.91, -104.35, -106.61, -107.02, -103.14, -102.22, -103.96, -105.86, -108.48, -109.88, -109.48, null, null, null, -108.55, -111.23, -115.84, -116.62, -113.88, -115.01, -119.0, -122.98, -112.07, -112.56, -124.1, -126.7, -130.5, -132.94, -131.87, -131.33, -132.45, -133.48, -134.89, -133.78, -134.56, -135.73, -138.48, -134.25, -116.86, -115.3, -115.3];
 
-const LIQ_LATEST={"date": "2026-03-28", "onrrp": 0.992, "reserves": 2993.955, "tga": 874.077, "tga_wow": 21.025, "sofr": 3.65, "iorb": 3.65, "effr": 3.64, "sofr90": 3.68416, "sofr90_src": "SOFR90DAYAVG", "sofr180": 3.87567, "sofr180_src": "SOFR180DAYAVG", "dw": 3.75, "srf": 0.0, "jpy": -1249.2, "sofr_iorb_bp": 0.0, "sofr_effr_bp": 1.0, "futures_price": 96.3158, "fwd_1x3_bp": 3.42, "fwd_3x6_bp": 19.15, "hibor_spread_bp": -115.3};
+const LIQ_LATEST={"date": "2026-03-28", "onrrp": 0.992, "reserves": 2993.955, "tga": 874.077, "tga_wow": 21.025, "sofr": 3.65, "iorb": 3.65, "effr": 3.64, "sofr90": 3.68416, "sofr90_src": "SOFR90DAYAVG", "dw": 3.75, "srf": 0.0, "jpy": -1249.2, "sofr_iorb_bp": 0.0, "sofr_effr_bp": 1.0, "futures_price": 96.3158, "hibor_spread_bp": -115.3};
 
 // ── 阈值配置 ──
 const THRESHOLDS = {

@@ -1,5 +1,533 @@
 [
   {
+    "date": "2025-12-29",
+    "sofr": 3.77,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 12.0,
+    "onrrp": 10.551
+  },
+  {
+    "date": "2025-12-30",
+    "sofr": 3.71,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 6.0,
+    "onrrp": 12.605,
+    "dw": 3.75
+  },
+  {
+    "date": "2025-12-31",
+    "sofr": 3.87,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 22.0,
+    "onrrp": 105.993,
+    "reserves": 2957.41,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-02",
+    "sofr": 3.75,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 10.0,
+    "onrrp": 5.667,
+    "reserves": 2957.41,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-05",
+    "sofr": 3.7,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 5.0,
+    "onrrp": 6.485,
+    "reserves": 2957.41,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-06",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 2.582,
+    "reserves": 2957.41,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-07",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 4.582,
+    "reserves": 2996.379,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-08",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 3.083,
+    "reserves": 2996.379,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-09",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 3.28,
+    "reserves": 2996.379,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-12",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 3.402,
+    "reserves": 2996.379,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-13",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 3.277,
+    "reserves": 2996.379,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-14",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 3.223,
+    "reserves": 3049.63,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-15",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 2.003,
+    "reserves": 3049.63,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-16",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 1.222,
+    "reserves": 3049.63,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-20",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 3.506,
+    "reserves": 3049.63,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-21",
+    "sofr": 3.63,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -2.0,
+    "onrrp": 3.344,
+    "reserves": 2954.903,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-22",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 2.058,
+    "reserves": 2954.903,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-23",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 0.927,
+    "reserves": 2954.903,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-26",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 1.489,
+    "reserves": 2954.903,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-27",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 1.253,
+    "reserves": 2954.903,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-28",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 1.103,
+    "reserves": 2901.6,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-29",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 2.852,
+    "reserves": 2901.6,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-01-30",
+    "sofr": 3.68,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 3.0,
+    "onrrp": 9.629,
+    "reserves": 2901.6,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-02",
+    "sofr": 3.69,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 4.0,
+    "onrrp": 10.415,
+    "reserves": 2901.6,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-03",
+    "sofr": 3.69,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 4.0,
+    "onrrp": 1.785,
+    "reserves": 2901.6,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-04",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 2.414,
+    "reserves": 2925.17,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-05",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 1.748,
+    "reserves": 2925.17,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-06",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 3.111,
+    "reserves": 2925.17,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-09",
+    "sofr": 3.63,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -2.0,
+    "onrrp": 1.306,
+    "reserves": 2925.17,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-10",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 1.447,
+    "reserves": 2925.17,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-11",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 1.048,
+    "reserves": 2939.557,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-12",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 2.844,
+    "reserves": 2939.557,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-13",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 0.377,
+    "reserves": 2939.557,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-17",
+    "sofr": 3.71,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 6.0,
+    "onrrp": 0.441,
+    "reserves": 2939.557,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-18",
+    "sofr": 3.73,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 8.0,
+    "onrrp": 0.856,
+    "reserves": 2949.804,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-19",
+    "sofr": 3.67,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 2.0,
+    "onrrp": 0.632,
+    "reserves": 2949.804,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-20",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 0.496,
+    "reserves": 2949.804,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-23",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 0.877,
+    "reserves": 2949.804,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-24",
+    "sofr": 3.67,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 2.0,
+    "onrrp": 0.917,
+    "reserves": 2949.804,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-25",
+    "sofr": 3.67,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 2.0,
+    "onrrp": 1.159,
+    "reserves": 2965.765,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-26",
+    "sofr": 3.67,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 2.0,
+    "onrrp": 3.796,
+    "reserves": 2965.765,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-02-27",
+    "sofr": 3.68,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 3.0,
+    "onrrp": 16.318,
+    "reserves": 2965.765,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-02",
+    "sofr": 3.71,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 6.0,
+    "onrrp": 0.627,
+    "reserves": 2965.765,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-03",
+    "sofr": 3.7,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 5.0,
+    "onrrp": 1.203,
+    "reserves": 2965.765,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-04",
+    "sofr": 3.67,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 2.0,
+    "onrrp": 0.877,
+    "reserves": 3015.531,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-05",
+    "sofr": 3.66,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 1.0,
+    "onrrp": 2.793,
+    "reserves": 3015.531,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-06",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 1.512,
+    "reserves": 3015.531,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-09",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 0.332,
+    "reserves": 3015.531,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-10",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 0.278,
+    "reserves": 3015.531,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-11",
+    "sofr": 3.64,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -1.0,
+    "onrrp": 0.552,
+    "reserves": 3037.665,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-12",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 0.137,
+    "reserves": 3037.665,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-13",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 0.427,
+    "reserves": 3037.665,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-16",
+    "sofr": 3.7,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 5.0,
+    "onrrp": 0.582,
+    "reserves": 3037.665,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-17",
+    "sofr": 3.65,
+    "iorb": 3.65,
+    "sofr_iorb_bp": 0.0,
+    "onrrp": 0.797,
+    "reserves": 3037.665,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-18",
+    "sofr": 3.62,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -3.0,
+    "onrrp": 0.698,
+    "reserves": 3019.995,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-19",
+    "sofr": 3.62,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -3.0,
+    "onrrp": 0.637,
+    "reserves": 3019.995,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-20",
+    "sofr": 3.62,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -3.0,
+    "onrrp": 0.822,
+    "reserves": 3019.995,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-23",
+    "sofr": 3.62,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -3.0,
+    "onrrp": 0.857,
+    "reserves": 3019.995,
+    "dw": 3.75
+  },
+  {
+    "date": "2026-03-24",
+    "sofr": 3.63,
+    "iorb": 3.65,
+    "sofr_iorb_bp": -2.0,
+    "onrrp": 1.123,
+    "reserves": 3019.995,
+    "dw": 3.75
+  },
+  {
     "date": "2026-03-25",
     "onrrp": 1.123,
     "reserves": 3019.995,
@@ -72,15 +600,11 @@
     "effr": 3.64,
     "sofr90": 3.68416,
     "sofr90_src": "SOFR90DAYAVG",
-    "sofr180": 3.87567,
-    "sofr180_src": "SOFR180DAYAVG",
     "dw": 3.75,
     "srf": 0.0,
     "jpy": -1249.2,
     "sofr_iorb_bp": 0.0,
     "sofr_effr_bp": 1.0,
-    "futures_price": 96.3158,
-    "fwd_1x3_bp": 3.42,
-    "fwd_3x6_bp": 19.15
+    "futures_price": 96.3158
   }
 ]
