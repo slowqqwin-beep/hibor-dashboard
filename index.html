@@ -73,6 +73,13 @@
   .liq-badge.red{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,0.25);}
   .liq-badge.red.blink{animation:liqblink 1s infinite;}
   @keyframes liqblink{0%,100%{opacity:1}50%{opacity:0.35}}
+  /* 三重共振卡 */
+  .resonance-card{padding:12px 18px;border-radius:8px;margin:10px 0;border:0.5px solid;}
+  .resonance-card.green{background:var(--green-dim);color:var(--green);border-color:rgba(74,222,128,0.25);}
+  .resonance-card.amber{background:var(--amber-dim);color:var(--amber);border-color:rgba(251,191,36,0.25);}
+  .resonance-card.orange{background:rgba(251,146,60,0.08);color:#fb923c;border-color:rgba(251,146,60,0.25);}
+  .resonance-card.red{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,0.25);}
+  .resonance-card.red.blink{animation:liqblink 1s infinite;}
   .kpi-threshold{font-size:9px;color:var(--dim);margin-top:4px;}
 
   /* charts */
@@ -199,15 +206,21 @@
     <span id="liq-badge-dot">●</span>
     <span id="liq-badge-text">— 计算中</span>
   </div>
-  <!-- 4张KPI卡 -->
-  <div class="kpi-row kpi-row-4" style="margin-bottom:10px;">
+  <!-- 5张KPI卡 -->
+  <div class="kpi-row kpi-row-5" style="margin-bottom:10px;">
     <!-- SOFR-IORB -->
     <div class="kpi green" id="kpi-sofr-iorb-card">
       <div class="kpi-label">SOFR − IORB 利差</div>
       <div class="kpi-val" id="kpi-sofr-iorb">—</div>
-      <div class="kpi-sub">bp · 准备金充裕度早期预警</div>
-      <div class="kpi-threshold">领先 WRESBAL 1-2 周</div>
+      <div class="kpi-sub">隔夜流动性 · SOFR时代流动性监测</div>
       <div class="signal neutral" id="sig-sofr-iorb">— 计算中</div>
+    </div>
+    <!-- SOFR-EFFR -->
+    <div class="kpi green" id="kpi-sofr-effr-card">
+      <div class="kpi-label">SOFR − EFFR 利差</div>
+      <div class="kpi-val" id="kpi-sofr-effr">—</div>
+      <div class="kpi-sub">bp · 货币市场压力</div>
+      <div class="signal neutral" id="sig-sofr-effr">— 计算中</div>
     </div>
     <!-- WRESBAL -->
     <div class="kpi blue" id="kpi-wresbal-card">
@@ -286,6 +299,15 @@
       <div class="card-title">准备金 + 贴现窗口 · 周频确认 · 近60日</div>
       <div class="chart-wrap-md"><canvas id="chartReserves"></canvas></div>
     </div>
+  </div>
+
+  <!-- 三重共振信号 -->
+  <div class="resonance-card green" id="resonance-card">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:13px;font-weight:700;letter-spacing:0.05em;">流动性三重共振</span>
+      <span style="font-size:12px;font-weight:600;" id="resonance-text">— 计算中</span>
+    </div>
+    <div style="font-size:10px;color:inherit;opacity:0.7;margin-top:5px;" id="resonance-detail">① SOFR曲线Back(1x3>3x6) · ② SOFR-IORB>5bp · ③ SOFR-EFFR>5bp</div>
   </div>
 
   <!-- ④ 利率曲线 -->
@@ -731,15 +753,27 @@ function updateKPI(){
   else{siR.className='signal neutral';siR.textContent='→ 比值横盘';}
 
   // SOFR 曲线 / 远期价差
-  const s6m   = data.sofr6m  ? data.sofr6m[i]  : null;
-  const f13   = data.fwd1x3  ? data.fwd1x3[i]  : null;
-  const f36   = data.fwd3x6  ? data.fwd3x6[i]  : null;
+  const s6m   = data.sofr6m         ? data.sofr6m[i]         : null;
+  const f13   = data.fwd1x3         ? data.fwd1x3[i]         : null;
+  const f36   = data.fwd3x6         ? data.fwd3x6[i]         : null;
+  const crvSh = data.sofrCurveShape ? data.sofrCurveShape[i] : null;
   if(s6m!=null) document.getElementById('kpi-sofr6m').textContent=s6m.toFixed(4)+'%';
   if(f13!=null) document.getElementById('kpi-fwd13').textContent=(f13>=0?'+':'')+f13.toFixed(1)+'bp';
   if(f36!=null) document.getElementById('kpi-fwd36').textContent=(f36>=0?'+':'')+f36.toFixed(1)+'bp';
   const siCrv=document.getElementById('sig-sofrcrv');
   const card=document.getElementById('kpi-sofrcrv-card');
-  if(f36!=null){
+  if(crvSh!=null){
+    if(crvSh>10){
+      siCrv.className='signal bearish'; siCrv.textContent='🔴 Back结构确认';
+      card.className='kpi orange';
+    } else if(crvSh>0){
+      siCrv.className='signal warning'; siCrv.textContent='⚠️ 近端压力';
+      card.className='kpi orange';
+    } else {
+      siCrv.className='signal bullish'; siCrv.textContent='✓ Contango · 正常形态';
+      card.className='kpi green';
+    }
+  } else if(f36!=null){
     if(f36>10){
       siCrv.className='signal bearish'; siCrv.textContent='↑ 市场预期收紧';
       card.className='kpi red';
@@ -765,19 +799,55 @@ function updateKPI(){
     document.getElementById('kpi-sofr-iorb').textContent=(si>=0?'+':'')+si.toFixed(1)+'bp';
     const siCard=document.getElementById('kpi-sofr-iorb-card');
     const siSig=document.getElementById('sig-sofr-iorb');
-    // check 3-day persistence
     let hi3=true;
     for(let k=1;k<=3;k++){const v=data.sofrIorb[i-k];if(v==null||v<=10){hi3=false;break;}}
     if(si<5){
-      siCard.className='kpi green'; siSig.className='signal bullish'; siSig.textContent='准备金充裕';
+      siCard.className='kpi green'; siSig.className='signal bullish'; siSig.textContent='隔夜充裕';
     } else if(si<10){
-      siCard.className='kpi amber'; siSig.className='signal warning'; siSig.textContent='开始分化';
-    } else {
-      siCard.className='kpi red'; siSig.className='signal bearish';
-      siSig.textContent=hi3?'压力信号 持续3日':'压力信号';
+      siCard.className='kpi amber'; siSig.className='signal warning'; siSig.textContent='轻度分化';
+    } else if(si<20){
+      siCard.className='kpi orange'; siSig.className='signal warning';
+      siSig.textContent=hi3?'压力累积 持续3日':'准备金压力';
       if(hi3) siCard.classList.add('blink');
+    } else {
+      siCard.className='kpi red blink'; siSig.className='signal bearish';
+      siSig.textContent='🔴 严重分化';
     }
   }
+
+  // SOFR-EFFR
+  const seVal = data.sofrEffrBp ? data.sofrEffrBp[i] : null;
+  if(seVal!=null){
+    document.getElementById('kpi-sofr-effr').textContent=(seVal>=0?'+':'')+seVal.toFixed(1)+'bp';
+    const seCard=document.getElementById('kpi-sofr-effr-card');
+    const seSig =document.getElementById('sig-sofr-effr');
+    if(seVal<5){
+      seCard.className='kpi green'; seSig.className='signal bullish'; seSig.textContent='货币市场平稳';
+    } else if(seVal<10){
+      seCard.className='kpi amber'; seSig.className='signal warning'; seSig.textContent='轻度压力';
+    } else if(seVal<20){
+      seCard.className='kpi orange'; seSig.className='signal warning'; seSig.textContent='货币市场压力';
+    } else {
+      seCard.className='kpi red blink'; seSig.className='signal bearish'; seSig.textContent='🔴 严重压力';
+    }
+  }
+
+  // 三重共振
+  const cShape = data.sofrCurveShape ? data.sofrCurveShape[i] : null;
+  const sEffr  = data.sofrEffrBp     ? data.sofrEffrBp[i]     : null;
+  const sIorb2 = data.sofrIorb       ? data.sofrIorb[i]       : null;
+  let nTrig=0,trigNames=[];
+  if(cShape!=null&&cShape>0){nTrig++;trigNames.push('①曲线Back('+cShape.toFixed(1)+'bp)');}
+  if(sIorb2!=null&&sIorb2>5){nTrig++;trigNames.push('②SOFR-IORB(+'+(sIorb2.toFixed(1))+'bp)');}
+  if(sEffr!=null&&sEffr>5){nTrig++;trigNames.push('③SOFR-EFFR(+'+(sEffr.toFixed(1))+'bp)');}
+  const rcCard=document.getElementById('resonance-card');
+  const rcText=document.getElementById('resonance-text');
+  const rcDetail=document.getElementById('resonance-detail');
+  if(nTrig===0){rcCard.className='resonance-card green';rcText.textContent='🟢 流动性正常';}
+  else if(nTrig===1){rcCard.className='resonance-card amber';rcText.textContent='🟡 流动性关注';}
+  else if(nTrig===2){rcCard.className='resonance-card orange';rcText.textContent='🟠 流动性预警 · 建议降低风险敞口';}
+  else{rcCard.className='resonance-card red blink';rcText.textContent='🔴 流动性危机 · 三重共振确认 · 全面避险';}
+  if(trigNames.length) rcDetail.textContent='触发：'+trigNames.join(' · ');
 
   // WRESBAL
   if(wre!=null){

@@ -103,16 +103,19 @@ def fetch_liq_bundle() -> dict:
     批量抓取美元流动性底层指标，全部来自 FRED（SRF 来自 Fed H.4.1）。
     返回字典，失败的字段不包含（调用方需做 .get() 防御）。
     字段说明：
-      onrrp       B    ON RRP 隔夜逆回购
-      reserves    T    银行准备金 (WRESBAL, M→T)
-      tga         B    TGA (WTREGEN, M→B)
-      tga_wow     B    TGA 周变化
-      sofr_on     %    Overnight SOFR
-      iorb        %    IORB
-      effr        %    联邦基金有效利率
-      dw          B    贴现窗口 DPCREDIT
-      srf         B    SRF 常备回购 (H.4.1)
-      sofr_iorb_bp bp  (sofr_on - iorb)×100
+      onrrp        B    ON RRP 隔夜逆回购
+      reserves     T    银行准备金 (WRESBAL, M→T)
+      tga          B    TGA (WTREGEN, M→B)
+      tga_wow      B    TGA 周变化
+      sofr_on      %    Overnight SOFR
+      sofr_1m      %    Term SOFR 30D avg
+      sofr_6m      %    Term SOFR 180D avg
+      iorb         %    IORB
+      effr         %    联邦基金有效利率
+      dw           B    贴现窗口 DPCREDIT
+      srf          B    SRF 常备回购 (H.4.1)
+      sofr_iorb_bp bp   (sofr_on - iorb)×100
+      sofr_effr_bp bp   (sofr_on - effr)×100
     """
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
@@ -161,6 +164,12 @@ def fetch_liq_bundle() -> dict:
     # 衍生：SOFR-IORB 利差
     if result.get("sofr_on") is not None and result.get("iorb") is not None:
         result["sofr_iorb_bp"] = round((result["sofr_on"] - result["iorb"]) * 100, 1)
+    # Term SOFR 1M / 6M（曲线形态计算用）
+    v = _get("SOFR30DAYAVG"); result["sofr_1m"] = v if v is not None else None
+    v = _get("SOFR180DAYAVG"); result["sofr_6m"] = v if v is not None else None
+    # 衍生：SOFR-EFFR 利差
+    if result.get("sofr_on") is not None and result.get("effr") is not None:
+        result["sofr_effr_bp"] = round((result["sofr_on"] - result["effr"]) * 100, 1)
 
     return {k: v for k, v in result.items() if v is not None}
 
@@ -298,6 +307,9 @@ def backfill_yields_history(history: list) -> list:
         "spread_3m10y": "T10Y3M",
         "bei_10y":      "T10YIE",
         "sofr_on":      "SOFR",
+        "sofr":         "SOFR90DAYAVG",   # Term SOFR 3M
+        "sofr_1m":      "SOFR30DAYAVG",   # Term SOFR 1M
+        "sofr_6m":      "SOFR180DAYAVG",  # Term SOFR 6M
         "iorb":         "IORB",
         "effr":         "FEDFUNDS",
         "onrrp":        "RRPONTSYD",
@@ -367,8 +379,24 @@ def backfill_yields_history(history: list) -> list:
         # SOFR-IORB bp
         sofr_on = all_obs[d].get("sofr_on")
         iorb    = all_obs[d].get("iorb")
+        effr    = all_obs[d].get("effr")
         if sofr_on is not None and iorb is not None:
             all_obs[d]["sofr_iorb_bp"] = round((sofr_on - iorb) * 100, 1)
+        # SOFR-EFFR bp
+        if sofr_on is not None and effr is not None:
+            all_obs[d]["sofr_effr_bp"] = round((sofr_on - effr) * 100, 1)
+        # SOFR 曲线形态（1x3 − 3x6）
+        s1m = all_obs[d].get("sofr_1m")
+        s3m = all_obs[d].get("sofr")
+        s6m = all_obs[d].get("sofr_6m")
+        if s1m is not None and s3m is not None:
+            all_obs[d]["sofr_fwd1x3"] = round((s3m - s1m) * 100, 1)
+        if s6m is not None and s3m is not None:
+            all_obs[d]["sofr_fwd3x6"] = round((s6m - s3m) * 100, 1)
+        f1x3 = all_obs[d].get("sofr_fwd1x3")
+        f3x6 = all_obs[d].get("sofr_fwd3x6")
+        if f1x3 is not None and f3x6 is not None:
+            all_obs[d]["sofr_curve_shape"] = round(f1x3 - f3x6, 1)
 
     # 合并进 history（只补缺失字段，不覆盖已有值）
     existing = {r["date"]: i for i, r in enumerate(history)}
@@ -716,7 +744,12 @@ def update_index_html(history: list) -> bool:
     tips_arr     = _ffill("tips_10y")
     cn10y_fred_arr  = _ffill("cn10y_fred")
     cnus_fred_arr   = _ffill("cnus_fred")
-    sofr_iorb_arr   = _ffill("sofr_iorb_bp")
+    sofr_iorb_arr        = _ffill("sofr_iorb_bp")
+    sofr_effr_arr        = _ffill("sofr_effr_bp")
+    sofr_fwd1x3_arr      = _ffill("sofr_fwd1x3")
+    sofr_fwd3x6_arr      = _ffill("sofr_fwd3x6")
+    sofr_curve_shape_arr = _ffill("sofr_curve_shape")
+    sofr_6m_arr          = _ffill("sofr_6m")
     wresbal_arr     = _ffill("reserves")
     dw_arr          = _ffill("dw")
     onrrp_arr       = _ffill("onrrp")
@@ -750,6 +783,11 @@ def update_index_html(history: list) -> bool:
         f"const CN10Y_FRED={json.dumps(cn10y_fred_arr)};\n"
         f"const CNUS_FRED={json.dumps(cnus_fred_arr)};\n"
         f"const SOFR_IORB={json.dumps(sofr_iorb_arr)};\n"
+        f"const SOFR_EFFR={json.dumps(sofr_effr_arr)};\n"
+        f"const FWD1X3={json.dumps(sofr_fwd1x3_arr)};\n"
+        f"const FWD3X6={json.dumps(sofr_fwd3x6_arr)};\n"
+        f"const SOFR_CURVE_SHAPE={json.dumps(sofr_curve_shape_arr)};\n"
+        f"const SOFR_6M={json.dumps(sofr_6m_arr)};\n"
         f"const WRESBAL={json.dumps(wresbal_arr)};\n"
         f"const DW_ARR={json.dumps(dw_arr)};\n"
         f"const ONRRP={json.dumps(onrrp_arr)};\n"
@@ -763,7 +801,10 @@ def update_index_html(history: list) -> bool:
         f"sp3m10y:[...SP3M10Y],bei10y:[...BEI10Y],tips10y:[...TIPS10Y],"
         f"tips:[...TIPS10Y],"
         f"cn10yFred:[...CN10Y_FRED],cnusFred:[...CNUS_FRED],"
-        f"sofrIorb:[...SOFR_IORB],wresbal:[...WRESBAL],dw:[...DW_ARR],"
+        f"sofrIorb:[...SOFR_IORB],sofrEffrBp:[...SOFR_EFFR],"
+        f"fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6],"
+        f"sofrCurveShape:[...SOFR_CURVE_SHAPE],sofr6m:[...SOFR_6M],"
+        f"wresbal:[...WRESBAL],dw:[...DW_ARR],"
         f"onrrp:[...ONRRP],tga:[...TGA_ARR]}};"
     )
 
@@ -1048,6 +1089,21 @@ def main():
     except Exception as e:
         print(f"   ERROR: {e}")
         errors.append("LIQ_BUNDLE")
+
+    # SOFR 曲线形态（依赖 sofr=Term 3M + liq_bundle sofr_1m/sofr_6m）
+    s3m = record.get("sofr")
+    s1m = record.get("sofr_1m")
+    s6m = record.get("sofr_6m")
+    if s1m is not None and s3m is not None:
+        record["sofr_fwd1x3"] = round((s3m - s1m) * 100, 1)
+    if s6m is not None and s3m is not None:
+        record["sofr_fwd3x6"] = round((s6m - s3m) * 100, 1)
+    if "sofr_fwd1x3" in record and "sofr_fwd3x6" in record:
+        record["sofr_curve_shape"] = round(record["sofr_fwd1x3"] - record["sofr_fwd3x6"], 1)
+    if "sofr_curve_shape" in record:
+        print(f"   SOFR曲线 1x3={record.get('sofr_fwd1x3',0):+.1f}bp  "
+              f"3x6={record.get('sofr_fwd3x6',0):+.1f}bp  "
+              f"形态={record['sofr_curve_shape']:+.1f}bp")
 
     # ── ④ ETF ────────────────────────────────────────────────────────
     print("\n④ ETF 收盘价")
