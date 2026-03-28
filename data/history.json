@@ -533,5 +533,23 @@
     "spread_bp": -115.42,
     "fwd_1x3_bp": 4.54,
     "fwd_3x6_bp": 19.32
+  },
+  {
+    "date": "2026-03-28",
+    "hibor": 2.53119,
+    "sofr": 3.68416,
+    "sofr_spot": 3.65,
+    "sofr6m": 3.87567,
+    "etf3033": NaN,
+    "etf3110": NaN,
+    "south": -28.83,
+    "iorb": 3.65,
+    "sofr_iorb": 0.0,
+    "wresbal": 2993.955,
+    "dw": 0.004,
+    "tips_10y": 2.08,
+    "spread_bp": -115.3,
+    "fwd_1x3_bp": 3.42,
+    "fwd_3x6_bp": 19.15
   }
 ]
