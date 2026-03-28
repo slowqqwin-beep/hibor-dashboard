@@ -25,7 +25,7 @@ import zipfile
 import requests
 import yfinance as yf
 import akshare as ak
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # WTI期货月份代码 (CME/NYMEX)
@@ -165,6 +165,95 @@ def backfill_etf_history(history: list) -> list:
         json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     print(f"  ETF 回填：新增 {added} 条 / 补字段 {updated} 处，共 {len(history)} 条")
+    return history
+
+
+# ────────────────────────────────────────────────────────────────────
+# 收益率曲线历史回填（首次运行或缺数据时自动执行）
+# ────────────────────────────────────────────────────────────────────
+def backfill_yields_history(history: list) -> list:
+    """
+    用 FRED API 拉取近 90 天的 DGS2/DGS10/T10Y2Y/T10Y3M/T10YIE
+    以及月频 IRLTLT01CNM156N（中国10Y），填充到 history 中。
+    仅在 us_2y 字段不足 60 条时触发（幂等）。
+    """
+    has_us2y = sum(1 for r in history if r.get("us_2y") is not None)
+    has_cnus  = sum(1 for r in history if r.get("cnus_fred") is not None)
+    if has_us2y >= 60 and has_cnus >= 60:
+        return history
+
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        print("  backfill_yields: FRED_API_KEY 未设置，跳过")
+        return history
+
+    print("\n── 收益率曲线历史回填 (90d) ─────────────────────────────")
+
+    # 日频序列
+    daily_map = {
+        "us_2y":        "DGS2",
+        "us_10y":       "DGS10",
+        "spread_2y10y": "T10Y2Y",
+        "spread_3m10y": "T10Y3M",
+        "bei_10y":      "T10YIE",
+    }
+    all_obs: dict = {}   # {date: {field: value}}
+    for field, sid in daily_map.items():
+        try:
+            obs = _fred_series_90d(sid, api_key)
+            for d, v in obs.items():
+                all_obs.setdefault(d, {})[field] = v
+            print(f"   {sid}: {len(obs)} 条")
+        except Exception as e:
+            print(f"   {sid} ERROR: {e}")
+
+    # 月频：IRLTLT01CNM156N（中国10Y）
+    cn10y_dict: dict = {}
+    try:
+        cn10y_dict = _fred_series_90d("IRLTLT01CNM156N", api_key, days=180)
+        print(f"   IRLTLT01CNM156N: {len(cn10y_dict)} 条（月频）")
+    except Exception as e:
+        print(f"   IRLTLT01CNM156N ERROR: {e}")
+
+    # 所有日期轴（合并 history 日期 + 抓取日期）
+    all_dates = sorted(set(list(all_obs.keys()) + [r["date"] for r in history]))
+
+    # Forward-fill 月频 CN10Y 到每个日期
+    cn10y_ff: dict = {}
+    last_cn = None
+    for d in all_dates:
+        if d in cn10y_dict:
+            last_cn = cn10y_dict[d]
+        cn10y_ff[d] = last_cn
+
+    # 把 cn10y_fred / cnus_fred 写入 all_obs
+    for d in all_dates:
+        if d not in all_obs:
+            continue
+        us10y = all_obs[d].get("us_10y")
+        cn = cn10y_ff.get(d)
+        if us10y is not None and cn is not None:
+            all_obs[d]["cn10y_fred"] = round(cn, 3)
+            all_obs[d]["cnus_fred"]  = round(us10y - cn, 3)
+
+    # 合并进 history（只补缺失字段，不覆盖已有值）
+    existing = {r["date"]: i for i, r in enumerate(history)}
+    updated = 0
+    for d, fields in sorted(all_obs.items()):
+        if d in existing:
+            rec = history[existing[d]]
+            for k, v in fields.items():
+                if rec.get(k) is None:
+                    rec[k] = v
+                    updated += 1
+
+    history.sort(key=lambda r: r["date"])
+    history = history[-MAX_HIST_DAYS:]
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"  收益率回填完成：补字段 {updated} 处，共 {len(history)} 条")
     return history
 
 
@@ -334,6 +423,26 @@ def _fred_latest(series_id: str, api_key: str) -> float:
     raise ValueError(f"FRED {series_id} 无有效数据")
 
 
+def _fred_series_90d(series_id: str, api_key: str, days: int = 90) -> dict:
+    """返回近 days 天的 FRED 序列，{date_str: float}，按日期升序。"""
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    params = {
+        "series_id": series_id, "api_key": api_key,
+        "file_type": "json", "sort_order": "asc",
+        "observation_start": start, "limit": "300",
+    }
+    r = requests.get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params=params, timeout=15,
+    )
+    r.raise_for_status()
+    return {
+        o["date"]: float(o["value"])
+        for o in r.json().get("observations", [])
+        if o["value"] != "."
+    }
+
+
 # ────────────────────────────────────────────────────────────────────
 # ⑩ 美债收益率曲线（FRED 批量）
 #    DGS2    → us_2y
@@ -354,10 +463,17 @@ def fetch_us_yields() -> dict:
         ("spread_3m10y", "T10Y3M"),
         ("bei_10y",      "T10YIE"),
         ("tips_10y",     "DFII10"),
+        ("cn10y_fred",   "IRLTLT01CNM156N"),   # 中国10Y（月频）
     ]
     result = {}
     for field, sid in series_map:
-        result[field] = _fred_latest(sid, api_key)
+        try:
+            result[field] = _fred_latest(sid, api_key)
+        except Exception as e:
+            print(f"   {sid} 跳过: {e}")
+    # 计算 US-CN 利差（%）
+    if result.get("us_10y") is not None and result.get("cn10y_fred") is not None:
+        result["cnus_fred"] = round(result["us_10y"] - result["cn10y_fred"], 3)
     return result
 
 
@@ -464,6 +580,8 @@ def update_index_html(history: list) -> bool:
     sp_3m10y_arr = _ffill("spread_3m10y")
     bei_arr      = _ffill("bei_10y")
     tips_arr     = _ffill("tips_10y")
+    cn10y_fred_arr = _ffill("cn10y_fred")
+    cnus_fred_arr  = _ffill("cnus_fred")
 
     today_str = date.today().isoformat()
 
@@ -489,14 +607,17 @@ def update_index_html(history: list) -> bool:
         f"const SP2Y10Y={json.dumps(sp_2y10y_arr)};\n"
         f"const SP3M10Y={json.dumps(sp_3m10y_arr)};\n"
         f"const BEI10Y={json.dumps(bei_arr)};\n"
-        f"const TIPS10Y={json.dumps(tips_arr)};\n\n"
+        f"const TIPS10Y={json.dumps(tips_arr)};\n"
+        f"const CN10Y_FRED={json.dumps(cn10y_fred_arr)};\n"
+        f"const CNUS_FRED={json.dumps(cnus_fred_arr)};\n\n"
         f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
         f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
         f"etf3110:[...ETF3110],ratio:[...RATIO],cnusSpread:[...CNUS],"
         f"cftcNet:[...CFTC_NET],cftcChg:[...CFTC_CHG],wtiM15:[...WTI_M15],"
         f"brentWti:[...BWTI],vix:[...VIX_ARR],wtiPx:[...WTI_PX],"
         f"us2y:[...US2Y],us10y:[...US10Y],sp2y10y:[...SP2Y10Y],"
-        f"sp3m10y:[...SP3M10Y],bei10y:[...BEI10Y],tips10y:[...TIPS10Y]}};"
+        f"sp3m10y:[...SP3M10Y],bei10y:[...BEI10Y],tips10y:[...TIPS10Y],"
+        f"cn10yFred:[...CN10Y_FRED],cnusFred:[...CNUS_FRED]}};"
     )
 
     html = INDEX_HTML.read_text(encoding="utf-8")
@@ -875,7 +996,7 @@ def main():
     # ── ⑩ 美债收益率曲线 ──────────────────────────────────────────────
     print("\n⑩ 美债收益率曲线（FRED）")
     _yield_fields = ("us_2y", "us_10y", "spread_2y10y", "spread_3m10y",
-                     "bei_10y", "tips_10y")
+                     "bei_10y", "tips_10y", "cn10y_fred", "cnus_fred")
     try:
         uy = fetch_us_yields()
         for fld in _yield_fields:
@@ -915,7 +1036,8 @@ def main():
     # ── 写入 ─────────────────────────────────────────────────────────
     print("\n── 写入 ──────────────────────────────────────────────────")
     history = load_history()
-    history = backfill_etf_history(history)   # 不足 60 条时自动回填 ETF 历史
+    history = backfill_etf_history(history)      # 不足 60 条时自动回填 ETF 历史
+    history = backfill_yields_history(history)   # us_2y/cnus_fred 不足 60 条时回填
     history = save_history(history, record)
     update_index_html(history)
 

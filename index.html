@@ -49,6 +49,7 @@
   .kpi.blue::before{background:linear-gradient(90deg,transparent,var(--blue),transparent);}
   .kpi.purple::before{background:linear-gradient(90deg,transparent,var(--purple),transparent);}
   .kpi.pink::before{background:linear-gradient(90deg,transparent,var(--pink),transparent);}
+  .kpi.orange::before{background:linear-gradient(90deg,transparent,#fb923c,transparent);}
   .kpi-label{font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
   .kpi-val{font-size:26px;font-weight:500;line-height:1;margin-bottom:3px;}
   .kpi.teal .kpi-val{color:var(--teal);}
@@ -58,6 +59,7 @@
   .kpi.blue .kpi-val{color:var(--blue);}
   .kpi.purple .kpi-val{color:var(--purple);}
   .kpi.pink .kpi-val{color:var(--pink);}
+  .kpi.orange .kpi-val{color:#fb923c;}
   .kpi-sub{font-size:10px;color:var(--muted);}
   .signal{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:500;letter-spacing:0.06em;margin-top:7px;}
   .signal.bullish{background:var(--green-dim);color:var(--green);border:0.5px solid rgba(74,222,128,0.2);}
@@ -287,6 +289,69 @@
     </div>
   </div>
 
+  <!-- ④ 利率曲线 -->
+  <div class="section-label">④ 美债利率曲线 · 2Y / 10Y / 利差 / BEI / 中美利差</div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:8px;">
+    <div class="kpi red" id="kpi-sp2y10y-card">
+      <div class="kpi-label">2Y−10Y 利差</div>
+      <div class="kpi-val" id="kpi-sp2y10y">—</div>
+      <div class="kpi-sub">T10Y2Y · % · 期限溢价</div>
+      <div class="signal neutral" id="sig-sp2y10y">— 计算中</div>
+    </div>
+    <div class="kpi blue" id="kpi-us2y-card">
+      <div class="kpi-label">2Y 美债收益率</div>
+      <div class="kpi-val" id="kpi-us2y">—</div>
+      <div class="kpi-sub">DGS2 · %</div>
+      <div class="signal neutral" id="sig-us2y">— 加载中</div>
+    </div>
+    <div class="kpi teal" id="kpi-us10y-card">
+      <div class="kpi-label">10Y 美债收益率</div>
+      <div class="kpi-val" id="kpi-us10y">—</div>
+      <div class="kpi-sub">DGS10 · %</div>
+      <div class="signal neutral" id="sig-us10y">— 加载中</div>
+    </div>
+  </div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:10px;">
+    <div class="kpi red" id="kpi-sp3m10y-card">
+      <div class="kpi-label">3M−10Y 利差</div>
+      <div class="kpi-val" id="kpi-sp3m10y">—</div>
+      <div class="kpi-sub">T10Y3M · % · 衰退预警</div>
+      <div class="signal neutral" id="sig-sp3m10y">— 计算中</div>
+    </div>
+    <div class="kpi amber" id="kpi-bei10y-card">
+      <div class="kpi-label">10Y BEI 通胀预期</div>
+      <div class="kpi-val" id="kpi-bei10y">—</div>
+      <div class="kpi-sub">T10YIE · %</div>
+      <div class="signal neutral" id="sig-bei10y">— 计算中</div>
+    </div>
+    <div class="kpi green" id="kpi-cnus-fred-card">
+      <div class="kpi-label">中美利差 US−CN 10Y</div>
+      <div class="kpi-val" id="kpi-cnus-fred">—</div>
+      <div class="kpi-sub">DGS10 − IRLTLT01CNM156N · %</div>
+      <div class="signal neutral" id="sig-cnus-fred">— 计算中</div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">2Y / 10Y 美债收益率 · 近60日</div>
+      <div class="chart-wrap"><canvas id="chartYields"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">2Y−10Y 利差 / 3M−10Y 利差 · 近60日（%）</div>
+      <div class="chart-wrap"><canvas id="chartYieldSpreads"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">BEI 10Y 通胀预期 · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartBei"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">中美利差 US−CN 10Y (FRED) · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartCnUs"></canvas></div>
+    </div>
+  </div>
+
   <!-- Table -->
   <div class="chart-card" style="margin-bottom:10px;">
     <div class="card-title">近期数据明细</div>
@@ -378,6 +443,7 @@ const baseScales={
 const baseOpts={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:baseScales,elements:{point:{radius:0,hoverRadius:4}}};
 
 let chartRates,chartSpread,chartETF,chartRatio,chartOverlay,chartLiqPressure,chartReserves;
+let chartYields,chartYieldSpreads,chartBei,chartCnUs;
 
 function initCharts(){
   const labels=data.dates;
@@ -529,6 +595,62 @@ function initCharts(){
       }
     },
     plugins:[wPlugin]
+  });
+
+  // ④ 利率曲线图表
+  const u2d  = data.us2y      || [];
+  const u10d = data.us10y     || [];
+  const s2d  = data.sp2y10y   || [];
+  const s3d  = data.sp3m10y   || [];
+  const beid = data.bei10y    || [];
+  const cnfd = data.cnusFred  || [];
+
+  // 8. 2Y / 10Y 收益率
+  chartYields = new Chart(document.getElementById('chartYields'),{
+    type:'line', data:{labels, datasets:[
+      {label:'2Y 美债',data:u2d,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,spanGaps:true},
+      {label:'10Y 美债',data:u10d,borderColor:'#2dd4bf',borderWidth:1.8,tension:0.4,borderDash:[5,3],fill:false,spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#60a5fa'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+
+  // 9. 2Y-10Y / 3M-10Y 利差
+  chartYieldSpreads = new Chart(document.getElementById('chartYieldSpreads'),{
+    type:'line', data:{labels, datasets:[
+      {label:'2Y−10Y (%)',data:s2d,borderColor:'#f87171',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:0},above:'rgba(248,113,113,0.08)',below:'rgba(74,222,128,0.08)'},spanGaps:true},
+      {label:'3M−10Y (%)',data:s3d,borderColor:'#fb923c',borderWidth:1.5,tension:0.4,borderDash:[5,3],
+       fill:false,spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#f87171'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+
+  // 10. BEI 10Y
+  chartBei = new Chart(document.getElementById('chartBei'),{
+    type:'line', data:{labels, datasets:[
+      {label:'BEI 10Y (%)',data:beid,borderColor:'#fbbf24',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:2},above:'rgba(248,113,113,0.07)',below:'rgba(74,222,128,0.07)'},spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{tooltip:{...tt('#fbbf24'),callbacks:{label:c=>` BEI: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'},
+        suggestedMin:1.5,suggestedMax:3.5}}}
+  });
+
+  // 11. 中美利差 FRED
+  chartCnUs = new Chart(document.getElementById('chartCnUs'),{
+    type:'line', data:{labels, datasets:[
+      {label:'US−CN 10Y (%)',data:cnfd,borderColor:'#4ade80',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:0},above:'rgba(74,222,128,0.08)',below:'rgba(248,113,113,0.08)'},spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{tooltip:{...tt('#4ade80'),callbacks:{label:c=>` US−CN: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
   });
 }
 
@@ -712,6 +834,83 @@ function updateKPI(){
     } else {
       badge.className='liq-badge amber'; badgeText.textContent='流动性警戒 · 接近阈值';
     }
+  }
+
+  // ── ④ 利率曲线 KPI ──────────────────────────────────────────────
+  function spreadClass(v){
+    if(v===null||v===undefined)return'red';
+    if(v<0)return'red';
+    if(v<0.25)return'orange';
+    if(v<0.5)return'amber';
+    return'green';
+  }
+  function spreadSig(v){
+    if(v===null||v===undefined)return['neutral','— 无数据'];
+    if(v<0)return['bearish','曲线倒挂 · 衰退信号'];
+    if(v<0.25)return['warning','接近倒挂 · 警戒'];
+    if(v<0.5)return['warning','曲线平坦 · 注意'];
+    return['bullish','正斜率 · 健康'];
+  }
+
+  const sp2=data.sp2y10y?data.sp2y10y[i]:null;
+  const sp3=data.sp3m10y?data.sp3m10y[i]:null;
+  const u2 =data.us2y   ?data.us2y[i]   :null;
+  const u10=data.us10y  ?data.us10y[i]  :null;
+  const bei=data.bei10y ?data.bei10y[i] :null;
+  const cnf=data.cnusFred?data.cnusFred[i]:null;
+
+  // 2Y-10Y
+  if(sp2!=null){
+    document.getElementById('kpi-sp2y10y').textContent=(sp2>=0?'+':'')+sp2.toFixed(3)+'%';
+    const [sc,st]=spreadSig(sp2);
+    const card=document.getElementById('kpi-sp2y10y-card'),sig=document.getElementById('sig-sp2y10y');
+    card.className='kpi '+spreadClass(sp2);
+    sig.className='signal '+sc; sig.textContent=st;
+  }
+  // 3M-10Y
+  if(sp3!=null){
+    document.getElementById('kpi-sp3m10y').textContent=(sp3>=0?'+':'')+sp3.toFixed(3)+'%';
+    const [sc,st]=spreadSig(sp3);
+    const card=document.getElementById('kpi-sp3m10y-card'),sig=document.getElementById('sig-sp3m10y');
+    card.className='kpi '+spreadClass(sp3);
+    sig.className='signal '+sc; sig.textContent=st;
+  }
+  // 2Y
+  if(u2!=null){
+    document.getElementById('kpi-us2y').textContent=u2.toFixed(3)+'%';
+    const prev=data.us2y[Math.max(0,i-5)];
+    const chg=prev!=null?u2-prev:0;
+    const sig=document.getElementById('sig-us2y');
+    if(chg>0.1){sig.className='signal bearish';sig.textContent='↑ 短端上行 · 压制估值';}
+    else if(chg<-0.1){sig.className='signal bullish';sig.textContent='↓ 短端下行 · 宽松预期';}
+    else{sig.className='signal neutral';sig.textContent='→ 短端稳定';}
+  }
+  // 10Y
+  if(u10!=null){
+    document.getElementById('kpi-us10y').textContent=u10.toFixed(3)+'%';
+    const prev=data.us10y[Math.max(0,i-5)];
+    const chg=prev!=null?u10-prev:0;
+    const sig=document.getElementById('sig-us10y');
+    if(chg>0.1){sig.className='signal bearish';sig.textContent='↑ 长端上行 · 压制黄金/科技';}
+    else if(chg<-0.1){sig.className='signal bullish';sig.textContent='↓ 长端下行 · 利好风险资产';}
+    else{sig.className='signal neutral';sig.textContent='→ 长端稳定';}
+  }
+  // BEI 10Y
+  if(bei!=null){
+    document.getElementById('kpi-bei10y').textContent=bei.toFixed(3)+'%';
+    const card=document.getElementById('kpi-bei10y-card'),sig=document.getElementById('sig-bei10y');
+    if(bei>2.5){card.className='kpi red';sig.className='signal bearish';sig.textContent='通胀预期过热 >2.5%';}
+    else if(bei>2){card.className='kpi amber';sig.className='signal warning';sig.textContent='通胀预期偏高 2~2.5%';}
+    else{card.className='kpi green';sig.className='signal bullish';sig.textContent='通胀预期温和 <2%';}
+  }
+  // 中美利差 FRED
+  if(cnf!=null){
+    document.getElementById('kpi-cnus-fred').textContent=(cnf>=0?'+':'')+cnf.toFixed(3)+'%';
+    const card=document.getElementById('kpi-cnus-fred-card'),sig=document.getElementById('sig-cnus-fred');
+    if(cnf<0){card.className='kpi red';sig.className='signal bearish';sig.textContent='US<CN · 异常倒挂';}
+    else if(cnf<0.5){card.className='kpi orange';sig.className='signal warning';sig.textContent='US-CN 利差偏窄 <0.5%';}
+    else if(cnf<1){card.className='kpi amber';sig.className='signal warning';sig.textContent='US-CN 利差收窄 0.5~1%';}
+    else{card.className='kpi green';sig.className='signal bullish';sig.textContent='US 利率溢价充足 >1%';}
   }
 }
 
