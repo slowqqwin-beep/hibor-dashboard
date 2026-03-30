@@ -911,105 +911,126 @@ def push_feishu_hibor(history: list, webhook_url: str) -> None:
         if chg is None: return "--"
         return f"{chg:+.2f}%"
 
-    # ── 构建飞书卡片 ──
+    # ── §2 美元流动性信号 ──
+    siorb    = today.get("sofr_iorb_bp")
+    reserves = today.get("reserves")   # T
+    dw       = today.get("dw")         # B
+    res_str  = f"{reserves:.0f}B" if reserves is not None else "--"
+    dw_str   = f"{dw:.2f}B"      if dw       is not None else "--"
+    siorb_str = f"{siorb:+.1f}bp" if siorb  is not None else "--"
+
+    usd_red    = (siorb is not None and siorb > 15) or (dw is not None and dw > 5)
+    usd_orange = (siorb is not None and siorb > 10) or (reserves is not None and reserves < 2900) or (dw is not None and dw > 2)
+    usd_yellow = (siorb is not None and siorb > 5)  or (reserves is not None and reserves < 3100)
+    if   usd_red:    usd_icon, usd_sig, usd_st = "🔴", "三重警戒·流动性紧张",   "red"
+    elif usd_orange: usd_icon, usd_sig, usd_st = "🟠", "指标偏紧·关注共振",     "orange"
+    elif usd_yellow: usd_icon, usd_sig, usd_st = "🟡", "轻微偏紧·持续跟踪",     "yellow"
+    else:            usd_icon, usd_sig, usd_st = "🟢", "美元流动性充裕",         "green"
+
+    # ── §5 利率曲线信号 ──
+    spr2y10 = today.get("spread_2y10y")
+    spr_bp  = round(spr2y10 * 100, 1) if spr2y10 is not None else None
+    tips    = today.get("tips_10y")
+    cnus    = today.get("cnus_bp")
+    cnus_str = f"{cnus:+.1f}bp" if cnus is not None else "--"
+    spr_str  = f"{spr_bp:+.1f}bp" if spr_bp is not None else "--"
+
+    if spr_bp is not None:
+        if   spr_bp < -50: yc_icon, yc_sig, yc_st = "🔴", "深度倒挂·衰退风险高", "red"
+        elif spr_bp <   0: yc_icon, yc_sig, yc_st = "🟠", "曲线倒挂·经济承压",   "orange"
+        elif spr_bp <  20: yc_icon, yc_sig, yc_st = "🟡", "曲线趋平·关注放缓",   "yellow"
+        else:              yc_icon, yc_sig, yc_st = "🟢", "曲线正常·周期健康",   "green"
+    else:
+        yc_icon, yc_sig, yc_st = "⚪", "数据待接入", "na"
+
+    # ── 综合信号 ──
+    # hk_st 沿用 spread_icon 逻辑
+    if   spread is not None and spread < -10: hk_st = "green"
+    elif spread is not None and spread <=  0: hk_st = "yellow"
+    elif spread is not None and spread <= 20: hk_st = "orange"
+    elif spread is not None:                  hk_st = "red"
+    else:                                     hk_st = "na"
+
+    scored = [s for s in [hk_st, usd_st, "na", yc_st] if s != "na"]  # §3外汇本repo无数据跳过
+    red_n, orange_n, yellow_n = scored.count("red"), scored.count("orange"), scored.count("yellow")
+    if   red_n > 0:                     ov_icon, ov_label, ov_tpl = "🔴", "全面避险·检查风险敞口", "red"
+    elif orange_n > 0 or yellow_n >= 3: ov_icon, ov_label, ov_tpl = "🟠", "降低仓位·控制回撤",     "orange"
+    elif yellow_n >= 1:                 ov_icon, ov_label, ov_tpl = "🟡", "保持关注·暂缓加仓",     "yellow"
+    else:                               ov_icon, ov_label, ov_tpl = "🟢", "市场正常·维持仓位",     "green"
+
+    # ── 构建新格式卡片 ──
+    def _fv(key, fmt=".2f"):
+        v = today.get(key)
+        try: return format(v, fmt) if v is not None else "--"
+        except: return "--"
+
+    sec_hk = (
+        f"**【港元流动性】**\n"
+        f"HIBOR: {_fv('hibor','.3f')}% | SOFR: {_fv('sofr','.3f')}% | 利差: {spread_icon} {spread:+.1f}bp\n"
+        f"状态：{spread_icon} {spread_signal}"
+    ) if spread is not None else (
+        f"**【港元流动性】**\n"
+        f"HIBOR: {_fv('hibor','.3f')}% | SOFR: {_fv('sofr','.3f')}% | 利差: --\n"
+        f"状态：⚪ 数据待接入"
+    )
+
+    sec_usd = (
+        f"**【美元流动性】**\n"
+        f"SOFR-IORB: {siorb_str} | WRESBAL: {res_str} | 贴现窗口: {dw_str}\n"
+        f"曲线结构：--\n"
+        f"状态：{usd_icon} {usd_sig}"
+    )
+
+    sec_fx = (
+        f"**【外汇信号】**\n"
+        f"DXY: -- | USDJPY: -- | AUDJPY: --\n"
+        f"状态：⚪ 数据待接入（本仓库暂未抓取）"
+    )
+
+    sec_hst = (
+        f"**【恒生科技】**\n"
+        f"3033: HK${_fv('etf3033','.3f')} | 3110: HK${_fv('etf3110','.3f')} | 比值: {f'{ratio:.4f}' if ratio else '--'}\n"
+        f"南向资金: {south_str}（{south_icon.replace('🟢 ','').replace('🔴 ','')}）\n"
+        f"状态：{spread_icon} {hk_pos}"
+    )
+
+    sec_yc = (
+        f"**【利率曲线】**\n"
+        f"2Y: {_fv('us_2y','.3f')}% | 10Y: {_fv('us_10y','.3f')}% | 2Y-10Y利差: {spr_str} | TIPS: {_fv('tips_10y','.3f')}%\n"
+        f"中美利差: {cnus_str}\n"
+        f"状态：{yc_icon} {yc_sig}"
+    )
+
+    sec_overall = (
+        f"**【综合信号】**\n"
+        f"{ov_icon} **{ov_label}**\n"
+        f"（{spread_icon}港元 {usd_icon}美元流动性 ⚪外汇 {yc_icon}利率曲线）"
+    )
+
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
-            "title": {
-                "tag": "plain_text",
-                "content": f"{title_prefix}港元流动性日报 · {today['date']}"
-            },
-            "template": header_tpl
+            "title": {"tag": "plain_text", "content": f"📊 付鹏框架每日监控 · {today['date']}"},
+            "template": ov_tpl,
         },
         "elements": [
-            # 利差 + 仓位两栏
-            {
-                "tag": "div",
-                "fields": [
-                    {
-                        "is_short": True,
-                        "text": {
-                            "tag": "lark_md",
-                            "content": (
-                                f"**HIBOR−SOFR 利差**\n"
-                                f"{spread_icon} **{spread:+.1f} bp** 　{spread_signal}\n"
-                                f"较昨日 {chg_str}"
-                            ) if spread is not None else "**HIBOR−SOFR 利差**\n--"
-                        }
-                    },
-                    {
-                        "is_short": True,
-                        "text": {
-                            "tag": "lark_md",
-                            "content": (
-                                f"**港股科技仓位建议**\n"
-                                f"**{hk_pos}**\n"
-                                f"HIBOR {hibor:.3f}%  SOFR {sofr:.3f}%"
-                            ) if (hibor and sofr) else f"**港股科技仓位建议**\n{hk_pos}"
-                        }
-                    }
-                ]
-            },
+            {"tag": "div", "text": {"tag": "lark_md", "content": sec_hk}},
             {"tag": "hr"},
-            # ETF 三栏
-            {
-                "tag": "div",
-                "fields": [
-                    {
-                        "is_short": True,
-                        "text": {
-                            "tag": "lark_md",
-                            "content": (
-                                f"**3033 (黄金ETF)**\n"
-                                f"HK${e3033:.3f}\n"
-                                f"5日 {etf_chg_str(e3033_5d_chg)}"
-                            ) if e3033 else "**3033**\n--"
-                        }
-                    },
-                    {
-                        "is_short": True,
-                        "text": {
-                            "tag": "lark_md",
-                            "content": (
-                                f"**3110 (纳斯达克ETF)**\n"
-                                f"HK${e3110:.3f}\n"
-                                f"5日 {etf_chg_str(e3110_5d_chg)}"
-                            ) if e3110 else "**3110**\n--"
-                        }
-                    },
-                    {
-                        "is_short": True,
-                        "text": {
-                            "tag": "lark_md",
-                            "content": (
-                                f"**3033÷3110 比值**\n"
-                                f"**{ratio:.4f}**\n"
-                                f"（相对强弱参考）"
-                            ) if ratio else "**比值**\n--"
-                        }
-                    }
-                ]
-            },
+            {"tag": "div", "text": {"tag": "lark_md", "content": sec_usd}},
             {"tag": "hr"},
-            # 南向资金
-            {
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": f"**南向资金**　{south_icon}　{south_str}"
-                }
-            },
-            # 脚注
+            {"tag": "div", "text": {"tag": "lark_md", "content": sec_fx}},
+            {"tag": "hr"},
+            {"tag": "div", "text": {"tag": "lark_md", "content": sec_hst}},
+            {"tag": "hr"},
+            {"tag": "div", "text": {"tag": "lark_md", "content": sec_yc}},
+            {"tag": "hr"},
+            {"tag": "div", "text": {"tag": "lark_md", "content": sec_overall}},
             {
                 "tag": "note",
-                "elements": [
-                    {
-                        "tag": "plain_text",
-                        "content": f"数据来源：东方财富·FRED·yfinance · 自动更新 {today['date']}"
-                    }
-                ]
-            }
-        ]
+                "elements": [{"tag": "plain_text",
+                               "content": f"数据来源：HKAB·FRED·东方财富·yfinance · 自动更新 {today['date']}"}],
+            },
+        ],
     }
 
     try:
@@ -1019,7 +1040,7 @@ def push_feishu_hibor(history: list, webhook_url: str) -> None:
             timeout=15, verify=False
         )
         if r.status_code == 200 and r.json().get("StatusCode") == 0:
-            print("  飞书推送 OK（港元流动性日报）")
+            print("  飞书推送 OK（付鹏框架每日监控）")
         else:
             print(f"  飞书推送失败: {r.status_code}  {r.text[:120]}")
     except Exception as e:
