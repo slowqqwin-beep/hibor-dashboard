@@ -598,8 +598,8 @@ function initCharts(){
     beforeDraw(chart){
       const {ctx,chartArea:{top,bottom,left,right},scales:{yL:ys,x:xs}}=chart;
       if(!ys)return;
-      const y3  = ys.getPixelForValue(3.0);
-      const y29 = ys.getPixelForValue(2.9);
+      const y3  = ys.getPixelForValue(3000);
+      const y29 = ys.getPixelForValue(2900);
       const yBot = ys.getPixelForValue(ys.min);
       // green zone >3.0T
       ctx.save();
@@ -614,7 +614,7 @@ function initCharts(){
   chartReserves = new Chart(document.getElementById('chartReserves'),{
     type:'line',
     data:{labels,datasets:[
-      {label:'WRESBAL (T)',data:wData,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'yL',
+      {label:'WRESBAL (B)',data:wData,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'yL',
        spanGaps:true},
       {label:'贴现窗口 (B)',data:dwData,borderColor:'#f87171',borderWidth:1.5,borderDash:[6,3],tension:0.3,fill:false,yAxisID:'yR',
        spanGaps:true}
@@ -628,7 +628,7 @@ function initCharts(){
       scales:{
         x:baseScales.x,
         yL:{...baseScales.y,position:'left',
-          ticks:{callback:v=>(v!=null?v.toFixed(2)+'T':'')},
+          ticks:{callback:v=>(v!=null?v.toFixed(2)+'B':'')},
           title:{display:true,text:'准备金 T',color:'#60a5fa',font:{size:9}}},
         yR:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},
           ticks:{callback:v=>(v!=null?v.toFixed(1)+'B':'')},
@@ -861,17 +861,17 @@ function updateKPI(){
 
   // WRESBAL
   if(wre!=null){
-    document.getElementById('kpi-wresbal').textContent=wre.toFixed(3)+'T';
-    const dist=wre-3.0;
-    document.getElementById('kpi-wresbal-dist').textContent='距3.0T: '+(dist>=0?'+':'')+dist.toFixed(3)+'T';
+    document.getElementById('kpi-wresbal').textContent=Math.round(wre).toLocaleString()+'B';
+    const dist=wre-3000;
+    document.getElementById('kpi-wresbal-dist').textContent='距3,000B: '+(dist>=0?'+':'')+Math.round(dist)+'B';
     const wCard=document.getElementById('kpi-wresbal-card');
     const wSig=document.getElementById('sig-wresbal');
-    if(wre>3.0){
-      wCard.className='kpi green'; wSig.className='signal bullish'; wSig.textContent='理想 >3.0T';
-    } else if(wre>2.9){
-      wCard.className='kpi amber'; wSig.className='signal warning'; wSig.textContent='警戒 2.9~3.0T';
+    if(wre>3000){
+      wCard.className='kpi green'; wSig.className='signal bullish'; wSig.textContent='理想 >3000B';
+   } else if(wre>2900){
+      wCard.className='kpi amber'; wSig.className='signal warning'; wSig.textContent='警戒 2900~3000B';
     } else {
-      wCard.className='kpi red'; wSig.className='signal bearish'; wSig.textContent='危险 <2.9T';
+      wCard.className='kpi red'; wSig.className='signal bearish'; wSig.textContent='危险 <2900B';
     }
   }
 
