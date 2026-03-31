@@ -2,6 +2,7 @@ name: Daily Data Update
 
 on:
   schedule:
+    - cron: "30 0 * * *"   # UTC 00:30 = 北京 08:30，早盘前晨报
     - cron: "30 9 * * *"   # UTC 09:30 = 北京 17:30，美股收盘后
   workflow_dispatch:
 
