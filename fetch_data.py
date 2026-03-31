@@ -1142,7 +1142,3 @@ def push_feishu_hibor(history: list, webhook_url: str) -> None:
             print(f"  飞书推送失败: {r.status_code}  {r.text[:120]}")
     except Exception as e:
         print(f"  飞书推送异常: {e}")
-
-
-if __name__ == "__main__":
-    main()
