@@ -1024,6 +1024,72 @@ def update_index_html(history: list) -> bool:
 # ────────────────────────────────────────────────────────────────────
 # 飞书推送 · 付鹏框架每日监控（统一卡片）
 # ────────────────────────────────────────────────────────────────────
+def _compute_macro_state(today: dict) -> dict:
+    """
+    基于付鹏框架，计算当日宏观状态（A/B/C/D/E）。
+    输入：history.json 最新一条记录。
+    输出：{state, score, label, portfolio, style}
+    """
+    score = 0.0
+
+    # 维度1：利率曲线（权重0.25）
+    sp3m = today.get("spread_3m10y")
+    sp2y = today.get("spread_2y10y")
+    if sp3m is not None:
+        if   sp3m > 1.5:  cs = 2.0
+        elif sp3m > 0.5:  cs = 1.0
+        elif sp3m > 0.0:  cs = 0.0
+        elif sp3m > -0.5: cs = -1.0
+        else:             cs = -2.0
+        if sp2y is not None and sp2y * sp3m < 0:
+            cs *= 0.7
+        score += cs * 0.25
+
+    # 维度2：流动性压力（权重0.20）
+    si = today.get("sofr_iorb_bp")
+    reserves_b = today.get("reserves_b")
+    if reserves_b is None:
+        reserves_t = today.get("reserves")
+        reserves_b = reserves_t * 1000 if reserves_t else None
+    ls = 0.0
+    if si is not None:
+        ls = -2.0 if si > 10 else (-1.0 if si > 5 else (0.5 if si < -5 else 0.0))
+    if reserves_b is not None:
+        if reserves_b < 2900:   ls -= 1.0
+        elif reserves_b > 3100: ls += 0.5
+    score += max(-2.0, min(2.0, ls)) * 0.20
+
+    # 维度3：实际利率（权重0.20）
+    tips = today.get("tips_10y")
+    if tips is not None:
+        lvl = 1.5 if tips < 0 else (0.5 if tips < 1 else (-0.5 if tips < 2 else -1.5))
+        score += lvl * 0.4 * 0.20
+
+    # 维度4：风险偏好 VIX（权重0.20）
+    vix = today.get("vix")
+    if vix is not None:
+        rs = -1.5 if vix > 35 else (-0.5 if vix > 25 else (0.5 if vix < 15 else 0.0))
+        score += rs * 0.20
+
+    # 维度5：HIBOR-SOFR 利差（港元流动性，权重0.15）
+    spread_bp = today.get("spread_bp")
+    if spread_bp is not None:
+        hs = (1.0 if spread_bp < -50 else
+              0.5 if spread_bp < -10 else
+              -1.0 if spread_bp > 30 else
+              -0.5 if spread_bp > 10 else 0.0)
+        score += hs * 0.15
+
+    if   score >= 2.0:  state, label, port, style = "A", "扩张期",      "钻头型",     "成长"
+    elif score >= 0.5:  state, label, port, style = "B", "滞胀压力期",  "哑铃型",     "价值"
+    elif score >= -0.5: state, label, port, style = "C", "衰退前期",    "哑铃型(防御)", "偏价值"
+    elif score >= -2.5: state, label, port, style = "E", "去杠杆期",    "锤子型",     "防御"
+    else:               state, label, port, style = "D", "流动性危机",  "锤子型",     "全防御"
+
+    return {"state": state, "score": round(score, 2),
+            "label": label, "portfolio": port, "style": style}
+
+
 def push_feishu_unified(history: list, webhook_url: str) -> None:
     import traceback as _tb
     try:
