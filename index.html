@@ -226,8 +226,8 @@
     <div class="kpi blue" id="kpi-wresbal-card">
       <div class="kpi-label">银行准备金 WRESBAL</div>
       <div class="kpi-val" id="kpi-wresbal">—</div>
-      <div class="kpi-sub">万亿美元 · 周频</div>
-      <div class="kpi-threshold" id="kpi-wresbal-dist">距3.0T: —</div>
+      <div class="kpi-sub">十亿美元 · 周频</div>
+      <div class="kpi-threshold" id="kpi-wresbal-dist">距3,000B: —</div>
       <div class="signal neutral" id="sig-wresbal">— 计算中</div>
     </div>
     <!-- DW -->
@@ -892,10 +892,10 @@ function updateKPI(){
   const badge=document.getElementById('liq-badge');
   const badgeText=document.getElementById('liq-badge-text');
   if(wre!=null&&dw!=null){
-    if(wre>3.0&&dw<2){
-      badge.className='liq-badge green'; badgeText.textContent='流动性理想 · WRESBAL>3T & DW<2B';
-    } else if(wre<2.9||dw>5){
-      badge.className='liq-badge red blink'; badgeText.textContent='流动性危险 · WRESBAL<2.9T 或 DW>5B';
+    if(wre>3000&&dw<2){
+      badge.className='liq-badge green'; badgeText.textContent='流动性理想 · WRESBAL>3000B & DW<2B';
+    } else if(wre<2900||dw>5){
+      badge.className='liq-badge red blink'; badgeText.textContent='流动性危险 · WRESBAL<2900B 或 DW>5B';
     } else {
       badge.className='liq-badge amber'; badgeText.textContent='流动性警戒 · 接近阈值';
     }
@@ -1027,12 +1027,12 @@ function updateInterp(){
   // ── 美元流动性底层信号 ──
   let liqScore=0;
   if(siV!=null&&siV<5) liqScore++; else if(siV!=null&&siV>10) liqScore--;
-  if(wreV!=null&&wreV>3.0) liqScore++; else if(wreV!=null&&wreV<2.9) liqScore-=2;
+  if(wreV!=null&&wreV>3000) liqScore++; else if(wreV!=null&&wreV<2900) liqScore-=2;
   if(tipChg!=null&&tipChg<-0.1) liqScore++; else if(tipChg!=null&&tipChg>0.1) liqScore--;
   if(liqScore>=2&&sp<-10){
-    t+='<strong>【做多加权】</strong> SOFR-IORB充裕+WRESBAL>3T+TIPS下行，美元流动性底层向好，与港元宽松共振——3033 积极做多。 ';
-  } else if(liqScore<=-2||siV>10&&wreV<2.9&&tipChg>0.1){
-    t+='<strong>【做空加权】</strong> SOFR-IORB>10bp+WRESBAL<2.9T+TIPS上行，美元流动性底层恶化——减仓3033，转守3110。 ';
+    t+='<strong>【做多加权】</strong> SOFR-IORB充裕+WRESBAL>3000B+TIPS下行，美元流动性底层向好，与港元宽松共振——3033 积极做多。 ';
+  } else if(liqScore<=-2||siV>10&&wreV<2900&&tipChg>0.1){
+    t+='<strong>【做空加权】</strong> SOFR-IORB>10bp+WRESBAL<2900B+TIPS上行，美元流动性底层恶化——减仓3033，转守3110。 ';
   } else if(siV!=null){
     t+=`SOFR-IORB ${siV>=0?'+':''}${siV!=null?siV.toFixed(1):'--'}bp（准备金底层）· WRESBAL ${wreV!=null?wreV.toFixed(3)+'T':'--'} · TIPS ${tipV!=null?tipV.toFixed(3)+'%':'--'}，底层流动性尚稳。 `;
   }

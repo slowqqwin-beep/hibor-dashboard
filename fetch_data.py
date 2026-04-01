@@ -104,7 +104,7 @@ def fetch_liq_bundle() -> dict:
     返回字典，失败的字段不包含（调用方需做 .get() 防御）。
     字段说明：
       onrrp        B    ON RRP 隔夜逆回购
-      reserves     T    银行准备金 (WRESBAL, M→T)
+      reserves     B    银行准备金 (WRESBAL, M÷1000=B)
       tga          B    TGA (WTREGEN, M→B)
       tga_wow      B    TGA 周变化
       sofr_on      %    Overnight SOFR
@@ -135,7 +135,7 @@ def fetch_liq_bundle() -> dict:
 
     # ON RRP（十亿美元）
     v = _get("RRPONTSYD"); result["onrrp"] = v if v is not None else None
-    # 银行准备金（WRESBAL 单位 B → ÷1000 = T）
+    # 银行准备金（WRESBAL 单位 M → ÷1000 = B）
     v = _get("WRESBAL", 1000); result["reserves"] = v if v is not None else None
     # TGA（WTREGEN 单位 M → ÷1000 = B）
     try:
@@ -326,7 +326,7 @@ def backfill_yields_history(history: list) -> list:
 
     # 周频序列（需 forward-fill）
     weekly_map = {
-        "reserves": ("WRESBAL",  1000),   # M → T
+        "reserves": ("WRESBAL",  1000),   # M → B
         "dw":       ("DPCREDIT", 1),      # 已是 B
     }
     weekly_raw: dict = {}   # {field: {date: value}}
@@ -1049,8 +1049,7 @@ def _compute_macro_state(today: dict) -> dict:
     si = today.get("sofr_iorb_bp")
     reserves_b = today.get("reserves_b")
     if reserves_b is None:
-        reserves_t = today.get("reserves")
-        reserves_b = reserves_t * 1000 if reserves_t else None
+        reserves_b = today.get("reserves")   # reserves 已是 B 单位（M÷1000）
     ls = 0.0
     if si is not None:
         ls = -2.0 if si > 10 else (-1.0 if si > 5 else (0.5 if si < -5 else 0.0))
@@ -1136,12 +1135,12 @@ def _push_feishu_unified_inner(history: list, webhook_url: str) -> None:
 
     # ── §2 美元流动性 ─────────────────────────────────────────────────
     siorb    = rec.get("sofr_iorb_bp")
-    reserves = rec.get("reserves")   # T
+    reserves = rec.get("reserves")   # B（WRESBAL M÷1000，约2994）
     dw       = rec.get("dw")         # B
     f1x3     = rec.get("sofr_fwd1x3")  # bp
     f3x6     = rec.get("sofr_fwd3x6")  # bp
 
-    res_str  = f"{reserves:.2f}T" if reserves is not None else "--"
+    res_str  = f"{reserves:.0f}B" if reserves is not None else "--"
     if f1x3 is not None and f3x6 is not None:
         curve_label = "Contango" if f3x6 > f1x3 else "Backwardation"
         curve_diff  = round(f3x6 - f1x3, 1)
@@ -1150,8 +1149,8 @@ def _push_feishu_unified_inner(history: list, webhook_url: str) -> None:
         curve_line  = "曲线结构：数据待接入"
 
     usd_red    = (siorb is not None and siorb > 15) or (dw is not None and dw > 5)
-    usd_orange = (siorb is not None and siorb > 10) or (reserves is not None and reserves < 2.9) or (dw is not None and dw > 2)
-    usd_yellow = (siorb is not None and siorb > 5)  or (reserves is not None and reserves < 3.1)
+    usd_orange = (siorb is not None and siorb > 10) or (reserves is not None and reserves < 2900) or (dw is not None and dw > 2)
+    usd_yellow = (siorb is not None and siorb > 5)  or (reserves is not None and reserves < 3100)
     if   usd_red:    usd_icon, usd_sig, usd_st = "🔴", "三重警戒·流动性紧张",   "red"
     elif usd_orange: usd_icon, usd_sig, usd_st = "🟠", "指标偏紧·关注共振",     "orange"
     elif usd_yellow: usd_icon, usd_sig, usd_st = "🟡", "轻微偏紧·持续跟踪",     "yellow"
@@ -1233,8 +1232,7 @@ def _push_feishu_unified_inner(history: list, webhook_url: str) -> None:
     cnus = rec.get("cnus_bp")
     if cnus is None and rec.get("cnus_fred") is not None:
         cnus = round(rec["cnus_fred"] * 100, 1)   # US−CN，正值
-    cnus_str = f"US高于CN {cnus:+.0f}bp" if (cnus is not None and cnus > 0) else (
-               f"CN高于US {abs(cnus):.0f}bp" if cnus is not None else "--")
+    cnus_str = f"{cnus:+.0f}bp" if cnus is not None else "--"
 
     if spr_bp is not None:
         if   spr_bp < -50: yc_icon, yc_sig, yc_st = "🔴", "深度倒挂·衰退风险高",   "red"
@@ -1366,7 +1364,7 @@ def main():
             record[k] = v
         parts = []
         if "sofr_iorb_bp" in liq: parts.append(f"SOFR-IORB={liq['sofr_iorb_bp']:+.1f}bp")
-        if "reserves"     in liq: parts.append(f"WRESBAL={liq['reserves']:.3f}T")
+        if "reserves"     in liq: parts.append(f"WRESBAL={liq['reserves']:.0f}B")
         if "dw"           in liq: parts.append(f"DW={liq['dw']:.2f}B")
         if "onrrp"        in liq: parts.append(f"ONRRP={liq['onrrp']:.1f}B")
         if "tga"          in liq: parts.append(f"TGA={liq['tga']:.3f}T")
