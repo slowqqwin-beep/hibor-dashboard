@@ -1117,29 +1117,45 @@ def push_feishu_unified(history: list, webhook_url: str) -> None:
     south_str  = f"{south:+.1f}亿港元（{south_flow}）" if south is not None else "--"
     ratio_str  = f"{ratio:.4f}" if ratio else "--"
 
-    # 恒科仓位建议（依赖 HIBOR-SOFR 利差，与 §1 同信号）
-    if   hk_st == "green"  and spread is not None and spread < -50: hk_pos = "全力做多3033 · 满仓+杠杆"
-    elif hk_st == "green":                                           hk_pos = "积极做多3033 · 七至满仓"
-    elif hk_st == "orange":                                          hk_pos = "半仓3033 · 观望"
-    elif hk_st == "red":                                             hk_pos = "减仓3033 · 转守3110"
-    else:                                                            hk_pos = "半仓3033 · 中性观望"
+    # 恒科仓位建议：宏观状态（A/B/C/D/E）× HIBOR 利差双重判断
+    macro = _compute_macro_state(rec)
+    macro_state = macro["state"]
+    macro_label = macro["label"]
+    hk_spread_ok = spread is not None and spread < -10  # HIBOR 宽松是必要条件
+
+    if macro_state in ("D", "E"):
+        hk_pos, hk_pos_icon = "锤子型：清仓风险资产，持现金/黄金", "🔴"
+    elif macro_state == "C":
+        hk_pos, hk_pos_icon = "衰退前期，减持3033，增配3110防御", "🟠"
+    elif macro_state == "B" and hk_spread_ok:
+        hk_pos, hk_pos_icon = "哑铃配置：3033(成长端)+3110(防御端)各半", "🟡"
+    elif macro_state == "B" and not hk_spread_ok:
+        hk_pos, hk_pos_icon = "滞胀期+港元偏紧，偏守3110", "🟠"
+    elif macro_state == "A" and hk_spread_ok:
+        hk_pos, hk_pos_icon = "积极做多3033，宏观+流动性双重确认", "🟢"
+    elif macro_state == "A" and not hk_spread_ok:
+        hk_pos, hk_pos_icon = "宏观扩张但港元偏紧，半仓观望", "🟡"
+    else:
+        hk_pos, hk_pos_icon = "数据不足，维持上期判断", "⚪"
 
     sec_hst = (
         f"**【恒生科技】**\n"
         f"3033: HK${fv('etf3033','.3f')} ｜ 3110: HK${fv('etf3110','.3f')} ｜ 比值: {ratio_str}\n"
         f"南向资金: {south_str}\n"
-        f"状态：{hk_icon} {hk_pos}"
+        f"宏观状态：{macro_state}（{macro_label}）评分 {macro['score']:+.2f}\n"
+        f"方向：{hk_pos_icon} {hk_pos}"
     )
 
     # ── §5 利率曲线 ───────────────────────────────────────────────────
     spr2y10 = rec.get("spread_2y10y")   # % (10Y - 2Y)
     spr_bp  = round(spr2y10 * 100, 1) if spr2y10 is not None else None
 
-    # 中美利差：cnus_bp = CN−US in bp；cnus_fred = US−CN in %（兼容两种存储）
+    # 中美利差：cnus_bp = US−CN in bp（正值=美债溢价）；cnus_fred = US−CN in %
     cnus = rec.get("cnus_bp")
     if cnus is None and rec.get("cnus_fred") is not None:
-        cnus = round(-rec["cnus_fred"] * 100, 1)
-    cnus_str = f"{cnus:+.1f}bp" if cnus is not None else "--"
+        cnus = round(rec["cnus_fred"] * 100, 1)   # US−CN，正值
+    cnus_str = f"US高于CN {cnus:+.0f}bp" if (cnus is not None and cnus > 0) else (
+               f"CN高于US {abs(cnus):.0f}bp" if cnus is not None else "--")
 
     if spr_bp is not None:
         if   spr_bp < -50: yc_icon, yc_sig, yc_st = "🔴", "深度倒挂·衰退风险高",   "red"
