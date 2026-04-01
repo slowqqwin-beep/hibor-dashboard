@@ -100,17 +100,28 @@ def fetch_sofr_3m() -> dict:
 # ────────────────────────────────────────────────────────────────────
 def fetch_liq_bundle() -> dict:
     """
-    字段说明（修复后）：
-      reserves_b   B    银行准备金 WRESBAL（十亿美元，原始单位）
-      reserves     T    同上 ÷1000（兼容旧字段，保留向后兼容）
+    批量抓取美元流动性底层指标，全部来自 FRED（SRF 来自 Fed H.4.1）。
+    返回字典，失败的字段不包含（调用方需做 .get() 防御）。
+    字段说明：
+      onrrp        B    ON RRP 隔夜逆回购
+      reserves     T    银行准备金 (WRESBAL, M→T)
+      tga          B    TGA (WTREGEN, M→B)
+      tga_wow      B    TGA 周变化
+      sofr_on      %    Overnight SOFR
+      sofr_1m      %    Term SOFR 30D avg
+      sofr_6m      %    Term SOFR 180D avg
+      iorb         %    IORB
+      effr         %    联邦基金有效利率
       dw           B    贴现窗口 DPCREDIT
+      srf          B    SRF 常备回购 (H.4.1)
       sofr_iorb_bp bp   (sofr_on - iorb)×100
+      sofr_effr_bp bp   (sofr_on - effr)×100
     """
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
         raise EnvironmentError("FRED_API_KEY not set")
     result = {}
- 
+
     def _get(sid, divisor=1):
         params = {"series_id": sid, "api_key": api_key, "file_type": "json",
                   "sort_order": "desc", "limit": "5"}
@@ -121,23 +132,12 @@ def fetch_liq_bundle() -> dict:
             if o["value"] != ".":
                 return round(float(o["value"]) / divisor, 3)
         return None
- 
-    # ON RRP（B）
-    v = _get("RRPONTSYD");      result["onrrp"]      = v
-    # ── BUG 1 FIX ──────────────────────────────────────────────────
-    # WRESBAL 原始单位是 B（十亿美元），不需要除以1000
-    # 旧代码: _get("WRESBAL", 1000) 得到的是 T，显示 "2.994T" 正确
-    #         但 HTML JS 里 kpi-sub 写的是"万亿美元"，数值也带 T 后缀
-    #         导致视觉上出现 "2993.955T"（其实是拼接 .toFixed(3)+'T'）
-    # 新做法: 存两个字段
-    #   reserves_b = 原始 B 值（约 2994）→ HTML 显示 "2,994 B"
-    #   reserves   = 换算 T 值（约 2.994）→ 图表用（保持向后兼容）
-    wres_b = _get("WRESBAL");          result["reserves_b"] = wres_b     # B
-    if wres_b is not None:
-        result["reserves"] = round(wres_b / 1000, 3)                    # T（兼容）
-    # ───────────────────────────────────────────────────────────────
- 
-    # TGA（WTREGEN 单位 M → B）
+
+    # ON RRP（十亿美元）
+    v = _get("RRPONTSYD"); result["onrrp"] = v if v is not None else None
+    # 银行准备金（WRESBAL 单位 B → ÷1000 = T）
+    v = _get("WRESBAL", 1000); result["reserves"] = v if v is not None else None
+    # TGA（WTREGEN 单位 M → ÷1000 = B）
     try:
         params = {"series_id": "WTREGEN", "api_key": api_key, "file_type": "json",
                   "sort_order": "desc", "limit": "5"}
@@ -146,29 +146,36 @@ def fetch_liq_bundle() -> dict:
         r.raise_for_status()
         obs = [o for o in r.json().get("observations", []) if o["value"] != "."]
         if obs:
-            result["tga"] = round(float(obs[0]["value"]) / 1000, 3)  # M→B
+            result["tga"] = round(float(obs[0]["value"]) / 1000, 3)
             result["tga_wow"] = (round(result["tga"] - float(obs[1]["value"]) / 1000, 3)
                                  if len(obs) >= 2 else 0.0)
     except Exception as e:
         print(f"   TGA ERROR: {e}")
- 
-    v = _get("SOFR");            result["sofr_on"]    = v
-    v = _get("IORB");            result["iorb"]       = v
-    v = _get("FEDFUNDS");        result["effr"]       = v
-    v = _get("DPCREDIT");        result["dw"]         = v   # 已是 B
+    # overnight SOFR（区别于 Term SOFR 3M → sofr 字段）
+    v = _get("SOFR"); result["sofr_on"] = v if v is not None else None
+    # IORB
+    v = _get("IORB"); result["iorb"] = v if v is not None else None
+    # EFFR
+    v = _get("FEDFUNDS"); result["effr"] = v if v is not None else None
+    # DW 贴现窗口（B）
+    v = _get("DPCREDIT"); result["dw"] = v if v is not None else None
+    # SRF（H.4.1 HTML parse）
     result["srf"] = _fetch_srf()
-    v = _get("SOFR30DAYAVG");    result["sofr_1m"]    = v
-    v = _get("SOFR180DAYAVG");   result["sofr_6m"]    = v
- 
+    # 衍生：SOFR-IORB 利差
     if result.get("sofr_on") is not None and result.get("iorb") is not None:
         result["sofr_iorb_bp"] = round((result["sofr_on"] - result["iorb"]) * 100, 1)
+    # Term SOFR 1M / 6M（曲线形态计算用）
+    v = _get("SOFR30DAYAVG"); result["sofr_1m"] = v if v is not None else None
+    v = _get("SOFR180DAYAVG"); result["sofr_6m"] = v if v is not None else None
+    # 衍生：SOFR-EFFR 利差
     if result.get("sofr_on") is not None and result.get("effr") is not None:
         result["sofr_effr_bp"] = round((result["sofr_on"] - result["effr"]) * 100, 1)
- 
+
     return {k: v for k, v in result.items() if v is not None}
- 
- 
+
+
 def _fetch_srf() -> float:
+    """解析 Fed H.4.1，返回 SRF 使用量（十亿美元）；失败或未使用则返回 0.0。"""
     try:
         from bs4 import BeautifulSoup
         r = requests.get(
@@ -413,19 +420,146 @@ def backfill_yields_history(history: list) -> list:
 
 
 # ────────────────────────────────────────────────────────────────────
+# 外汇信号历史回填（首次运行或 dxy 不足 60 条时自动执行）
+# ────────────────────────────────────────────────────────────────────
+def backfill_fx_history(history: list) -> list:
+    """
+    回填外汇信号 90 天历史：
+      yfinance 日频：DXY / USDJPY / AUDJPY
+      FRED 月频（forward-fill）：JP 2Y / DE 10Y / IT 10Y
+    衍生写入：us_jp_2y_spread / de_us_spread / it_de_spread
+              usdjpy_1d_chg / audjpy_5d_chg
+    仅在 dxy 字段不足 60 条时触发（幂等）。
+    """
+    has_dxy = sum(1 for r in history if r.get("dxy") is not None)
+    if has_dxy >= 60:
+        return history
+
+    print("\n── 外汇信号历史回填 (90d) ──────────────────────────────────")
+    api_key = os.environ.get("FRED_API_KEY", "")
+    all_obs: dict = {}   # {date_str: {field: value}}
+
+    # ── yfinance 日频 ──────────────────────────────────────────────
+    for ticker, field in [("DX-Y.NYB", "dxy"),
+                          ("USDJPY=X", "usdjpy"),
+                          ("AUDJPY=X", "audjpy")]:
+        try:
+            h = yf.Ticker(ticker).history(period="3mo")
+            if h.empty:
+                print(f"   {ticker}: 无数据，跳过")
+                continue
+            for dt, row in h.iterrows():
+                d = str(dt.date())
+                all_obs.setdefault(d, {})[field] = round(float(row["Close"]), 4)
+            print(f"   {ticker}: {len(h)} 条  ✓")
+        except Exception as e:
+            print(f"   {ticker} ERROR: {e}")
+
+    # 计算 usdjpy_1d_chg / audjpy_5d_chg（基于已拉取的序列）
+    sorted_dates = sorted(all_obs.keys())
+    usdjpy_pts = [(d, all_obs[d]["usdjpy"]) for d in sorted_dates if all_obs[d].get("usdjpy") is not None]
+    audjpy_pts = [(d, all_obs[d]["audjpy"]) for d in sorted_dates if all_obs[d].get("audjpy") is not None]
+    for idx, (d, v) in enumerate(usdjpy_pts):
+        if idx >= 1:
+            prev = usdjpy_pts[idx - 1][1]
+            all_obs[d]["usdjpy_1d_chg"] = round((v / prev - 1) * 100, 3)
+    for idx, (d, v) in enumerate(audjpy_pts):
+        if idx >= 5:
+            prev5 = audjpy_pts[idx - 5][1]
+            all_obs[d]["audjpy_5d_chg"] = round((v / prev5 - 1) * 100, 3)
+
+    # ── FRED 月频（forward-fill） ──────────────────────────────────
+    monthly_raw: dict = {}   # {field: {date: value}}
+    if api_key:
+        for field, sid in [("jp_2y",  "IRLTLT01JPM156N"),
+                           ("de_10y", "IRLTLT01DEM156N"),
+                           ("it_10y", "IRLTLT01ITM156N")]:
+            try:
+                obs = _fred_series_90d(sid, api_key, days=180)
+                monthly_raw[field] = obs
+                print(f"   {sid}: {len(obs)} 条（月频）")
+            except Exception as e:
+                print(f"   {sid} ERROR: {e}")
+
+    # 合并所有日期轴（history + 抓取日期）
+    all_dates = sorted(set(list(all_obs.keys()) + [r["date"] for r in history]))
+
+    def _ffill_dict(raw: dict, dates: list) -> dict:
+        out, last = {}, None
+        for d in dates:
+            if d in raw:
+                last = raw[d]
+            out[d] = last
+        return out
+
+    monthly_ff = {f: _ffill_dict(raw, all_dates) for f, raw in monthly_raw.items()}
+    hist_by_date = {r["date"]: r for r in history}
+
+    for d in all_dates:
+        if d not in all_obs:
+            all_obs[d] = {}
+        # 月频 forward-fill
+        for field, ff in monthly_ff.items():
+            if ff.get(d) is not None and all_obs[d].get(field) is None:
+                all_obs[d][field] = ff[d]
+        # 衍生利差（需要 us_2y / us_10y，从同日 history 取）
+        hr = hist_by_date.get(d, {})
+        us2y  = hr.get("us_2y")
+        us10y = hr.get("us_10y")
+        jp2y  = all_obs[d].get("jp_2y")
+        de10y = all_obs[d].get("de_10y")
+        it10y = all_obs[d].get("it_10y")
+        if us2y is not None and jp2y is not None and all_obs[d].get("us_jp_2y_spread") is None:
+            all_obs[d]["us_jp_2y_spread"] = round(us2y - jp2y, 4)
+        if de10y is not None and us10y is not None and all_obs[d].get("de_us_spread") is None:
+            all_obs[d]["de_us_spread"] = round(de10y - us10y, 4)
+        if it10y is not None and de10y is not None and all_obs[d].get("it_de_spread") is None:
+            all_obs[d]["it_de_spread"] = round(it10y - de10y, 4)
+
+    # 合并进 history（只补缺失字段）
+    existing = {r["date"]: i for i, r in enumerate(history)}
+    updated = 0
+    for d, fields in sorted(all_obs.items()):
+        if d in existing:
+            rec = history[existing[d]]
+            for k, v in fields.items():
+                if rec.get(k) is None and v is not None:
+                    rec[k] = v
+                    updated += 1
+
+    history.sort(key=lambda r: r["date"])
+    history = history[-MAX_HIST_DAYS:]
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"  外汇信号回填完成：补字段 {updated} 处，共 {len(history)} 条")
+    return history
+
+
+# ────────────────────────────────────────────────────────────────────
 # ④ 南向资金
 # ────────────────────────────────────────────────────────────────────
 # ⑤ 中美利差 10Y  (CN via akshare, US via FRED DGS10)
 # ────────────────────────────────────────────────────────────────────
 def fetch_cn_us_spread() -> dict:
+    from datetime import timedelta
+
+    # US 10Y from FRED DGS10
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
         raise EnvironmentError("FRED_API_KEY not set")
- 
-    params = {"series_id": "DGS10", "api_key": api_key, "file_type": "json",
-              "sort_order": "desc", "limit": "5"}
-    r = requests.get("https://api.stlouisfed.org/fred/series/observations",
-                     params=params, timeout=15)
+    params = {
+        "series_id":  "DGS10",
+        "api_key":    api_key,
+        "file_type":  "json",
+        "sort_order": "desc",
+        "limit":      "5",
+    }
+    r = requests.get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params=params, timeout=15,
+    )
     r.raise_for_status()
     us10y = None
     for obs in r.json().get("observations", []):
@@ -434,7 +568,8 @@ def fetch_cn_us_spread() -> dict:
             break
     if us10y is None:
         raise ValueError("FRED DGS10 无有效数据")
- 
+
+    # CN 10Y from akshare bond_zh_us_rate
     start = (date.today() - timedelta(days=30)).strftime("%Y%m%d")
     df = ak.bond_zh_us_rate(start_date=start)
     cn_col = next((c for c in df.columns if "中国" in c and "10年" in c), None)
@@ -444,13 +579,11 @@ def fetch_cn_us_spread() -> dict:
     if df.empty:
         raise ValueError("akshare CN 10Y 无有效数据")
     cn10y = float(df.iloc[-1][cn_col])
- 
-    # ── BUG 2 FIX：统一为 US - CN（正值表示美债溢价）──
+
     return {
-        "cn10y":              cn10y,
-        "us10y":              us10y,
-        "cnus_bp":            round((us10y - cn10y) * 100, 2),   # 正值=美债高于中债
-        "spread_us_minus_cn": round(us10y - cn10y, 3),           # % 格式
+        "cn10y":     cn10y,
+        "us10y":     us10y,
+        "spread_bp": round((cn10y - us10y) * 100, 2),
     }
 
 
@@ -552,6 +685,72 @@ def fetch_vix() -> dict:
 
 
 # ────────────────────────────────────────────────────────────────────
+# ⑪ 外汇信号（DXY / USDJPY / AUDJPY + 月频利差）
+# ────────────────────────────────────────────────────────────────────
+def fetch_fx_signals(us_2y_val=None, us_10y_val=None) -> dict:
+    """
+    拉取外汇信号指标（最新值）：
+      DXY (DX-Y.NYB)、USDJPY (USDJPY=X)、AUDJPY (AUDJPY=X) — yfinance
+      JP 2Y  (IRLTLT01JPM156N)、DE 10Y (IRLTLT01DEM156N)、
+      IT 10Y (IRLTLT01ITM156N)                              — FRED 月频
+    衍生：
+      us_jp_2y_spread = us_2y − jp_2y
+      de_us_spread    = de_10y − us_10y
+      it_de_spread    = it_10y − de_10y
+      usdjpy_1d_chg   单日涨跌幅 %
+      audjpy_5d_chg   5日涨跌幅 %
+    """
+    api_key = os.environ.get("FRED_API_KEY", "")
+    result = {}
+
+    # yfinance 日频（period="10d" 保证有足够行计算 1d/5d 变化）
+    for ticker, field in [("DX-Y.NYB", "dxy"),
+                          ("USDJPY=X", "usdjpy"),
+                          ("AUDJPY=X", "audjpy")]:
+        try:
+            h = yf.Ticker(ticker).history(period="10d")
+            if h.empty:
+                raise ValueError("无数据")
+            result[field] = round(float(h["Close"].iloc[-1]), 4)
+            if field == "usdjpy" and len(h) >= 2:
+                prev = float(h["Close"].iloc[-2])
+                result["usdjpy_1d_chg"] = round((result["usdjpy"] / prev - 1) * 100, 3)
+            if field == "audjpy":
+                if len(h) >= 6:
+                    prev5 = float(h["Close"].iloc[-6])
+                else:
+                    prev5 = float(h["Close"].iloc[0])
+                result["audjpy_5d_chg"] = round((result["audjpy"] / prev5 - 1) * 100, 3)
+        except Exception as e:
+            print(f"   {ticker} ERROR: {e}")
+
+    # FRED 月频
+    if api_key:
+        for field, sid in [("jp_2y",  "IRLTLT01JPM156N"),
+                           ("de_10y", "IRLTLT01DEM156N"),
+                           ("it_10y", "IRLTLT01ITM156N")]:
+            try:
+                result[field] = _fred_latest(sid, api_key)
+            except Exception as e:
+                print(f"   {sid} ERROR: {e}")
+
+    # 衍生计算
+    us2y  = us_2y_val  if us_2y_val  is not None else result.get("us_2y")
+    us10y = us_10y_val if us_10y_val is not None else result.get("us_10y")
+    jp2y  = result.get("jp_2y")
+    de10y = result.get("de_10y")
+    it10y = result.get("it_10y")
+    if us2y is not None and jp2y is not None:
+        result["us_jp_2y_spread"] = round(us2y - jp2y, 4)
+    if de10y is not None and us10y is not None:
+        result["de_us_spread"] = round(de10y - us10y, 4)
+    if it10y is not None and de10y is not None:
+        result["it_de_spread"] = round(it10y - de10y, 4)
+
+    return result
+
+
+# ────────────────────────────────────────────────────────────────────
 # ─ FRED 单序列辅助：取最新非空值
 # ────────────────────────────────────────────────────────────────────
 def _fred_latest(series_id: str, api_key: str) -> float:
@@ -603,7 +802,6 @@ def fetch_us_yields() -> dict:
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
         raise EnvironmentError("FRED_API_KEY not set")
- 
     series_map = [
         ("us_2y",        "DGS2"),
         ("us_10y",       "DGS10"),
@@ -611,7 +809,7 @@ def fetch_us_yields() -> dict:
         ("spread_3m10y", "T10Y3M"),
         ("bei_10y",      "T10YIE"),
         ("tips_10y",     "DFII10"),
-        ("cn10y_fred",   "IRLTLT01CNM156N"),   # 中国10Y（月频，滞后2-3个月）
+        ("cn10y_fred",   "IRLTLT01CNM156N"),   # 中国10Y（月频）
     ]
     result = {}
     for field, sid in series_map:
@@ -619,18 +817,9 @@ def fetch_us_yields() -> dict:
             result[field] = _fred_latest(sid, api_key)
         except Exception as e:
             print(f"   {sid} 跳过: {e}")
- 
-    # ── BUG 2 FIX ──────────────────────────────────────────────────
-    # 统一语义：cnus_fred = US10Y - CN10Y（正值 = 美债收益率高于中债）
-    # 当前美债 ≈ 4.4%，中债 ≈ 1.7%，cnus_fred ≈ +2.7%（约 +270bp）
-    # 旧代码已是 us_10y - cn10y，但 fetch_cn_us_spread() 是 cn - us（负值）
-    # 飞书里用的是 cnus_bp（来自 fetch_cn_us_spread，是负值）所以显示 -263bp
-    # 修复：废弃 fetch_cn_us_spread() 的 cnus_bp 字段，统一用 cnus_fred
+    # 计算 US-CN 利差（%）
     if result.get("us_10y") is not None and result.get("cn10y_fred") is not None:
         result["cnus_fred"] = round(result["us_10y"] - result["cn10y_fred"], 3)
-        result["cnus_bp"]   = round(result["cnus_fred"] * 100, 1)  # bp，正值=美债溢价
-    # ───────────────────────────────────────────────────────────────
- 
     return result
 
 
@@ -685,10 +874,11 @@ def update_index_html(history: list) -> bool:
     if not INDEX_HTML.exists():
         print(f"  WARNING: {INDEX_HTML} 不存在，跳过")
         return False
- 
+
     rows = history[-MAX_CHART_DAYS:]
     n    = len(rows)
- 
+
+    # SOFR 缺失时向前填充
     last_sofr = 0.0
     sofrs = []
     for r in rows:
@@ -696,7 +886,16 @@ def update_index_html(history: list) -> bool:
         if v is not None:
             last_sofr = v
         sofrs.append(last_sofr)
- 
+
+    # 中美利差缺失时向前填充
+    last_cnus = None
+    cnus_list = []
+    for r in rows:
+        v = r.get("cnus_bp")
+        if v is not None:
+            last_cnus = v
+        cnus_list.append(last_cnus)
+
     def _ffill(key):
         last = None
         out = []
@@ -706,18 +905,15 @@ def update_index_html(history: list) -> bool:
                 last = v
             out.append(last)
         return out
- 
-    dates   = [r["date"]                           for r in rows]
+
+    dates   = [r["date"]                         for r in rows]
     hibors  = _ffill("hibor")
-    spreads = [round((hibors[i] - sofrs[i]) * 100, 2)
-               if hibors[i] is not None and sofrs[i] is not None else None
-               for i in range(n)]
-    souths  = [r.get("south", 0.0)                 for r in rows]
+    spreads = [round((hibors[i] - sofrs[i]) * 100, 2) if hibors[i] is not None and sofrs[i] is not None else None for i in range(n)]
+    souths  = [r.get("south", 0.0)               for r in rows]
     etf3033 = _ffill("etf3033")
     etf3110 = _ffill("etf3110")
-    ratios  = [round(etf3033[i] / etf3110[i], 4)
-               if etf3033[i] and etf3110[i] else None for i in range(n)]
- 
+    ratios  = [round(etf3033[i] / etf3110[i], 4) if etf3033[i] and etf3110[i] else None for i in range(n)]
+
     cftc_net     = _ffill("cftc_net")
     cftc_chg     = _ffill("cftc_chg")
     wti_m15      = _ffill("wti_m15")
@@ -731,45 +927,27 @@ def update_index_html(history: list) -> bool:
     bei_arr      = _ffill("bei_10y")
     tips_arr     = _ffill("tips_10y")
     cn10y_fred_arr  = _ffill("cn10y_fred")
-    cnus_fred_arr   = _ffill("cnus_fred")      # US - CN，正值
-    cnus_bp_arr     = _ffill("cnus_bp")        # bp，正值=美债溢价
- 
+    cnus_fred_arr   = _ffill("cnus_fred")
     sofr_iorb_arr        = _ffill("sofr_iorb_bp")
     sofr_effr_arr        = _ffill("sofr_effr_bp")
     sofr_fwd1x3_arr      = _ffill("sofr_fwd1x3")
     sofr_fwd3x6_arr      = _ffill("sofr_fwd3x6")
     sofr_curve_shape_arr = _ffill("sofr_curve_shape")
     sofr_6m_arr          = _ffill("sofr_6m")
- 
-    # ── BUG 1 FIX: WRESBAL 用 reserves_b（B单位），不用 reserves（T单位）──
-    # 旧: wresbal_arr = _ffill("reserves")  → 值约 2.994（T），JS 里加 T 后缀 → "2.994T" ✓
-    # 问题: 历史数据里没有 reserves_b 字段（旧记录只有 reserves）
-    # 方案: 优先用 reserves_b（B），没有则用 reserves×1000（从T换算回B）
-    wresbal_b_arr = []
-    for r in rows:
-        v_b = r.get("reserves_b")           # 新字段，B
-        v_t = r.get("reserves")             # 旧字段，T
-        if v_b is not None:
-            wresbal_b_arr.append(v_b)
-        elif v_t is not None:
-            wresbal_b_arr.append(round(v_t * 1000, 1))   # T → B
-        else:
-            wresbal_b_arr.append(None)
-    # forward-fill
-    last_w = None
-    wresbal_arr_ff = []
-    for v in wresbal_b_arr:
-        if v is not None:
-            last_w = v
-        wresbal_arr_ff.append(last_w)
-    # ───────────────────────────────────────────────────────────────
- 
+    wresbal_arr     = _ffill("reserves")
     dw_arr          = _ffill("dw")
     onrrp_arr       = _ffill("onrrp")
     tga_arr         = _ffill("tga")
- 
+    # ── ⑥ 外汇信号 ──────────────────────────────────────────────────
+    us_jp_2y_arr    = _ffill("us_jp_2y_spread")
+    dxy_arr         = _ffill("dxy")
+    usdjpy_arr      = _ffill("usdjpy")
+    audjpy_arr      = _ffill("audjpy")
+    de_us_arr       = _ffill("de_us_spread")
+    it_de_arr       = _ffill("it_de_spread")
+
     today_str = date.today().isoformat()
- 
+
     new_block = (
         f"// ── 实时数据（fetch_data.py 写入 {today_str}）──\n"
         f"const DATES={json.dumps(dates)};\n"
@@ -780,7 +958,7 @@ def update_index_html(history: list) -> bool:
         f"const ETF3033={json.dumps(etf3033)};\n"
         f"const ETF3110={json.dumps(etf3110)};\n"
         f"const RATIO={json.dumps(ratios)};\n"
-        f"const CNUS  ={json.dumps(cnus_bp_arr)};\n"        # bp，正值=美债溢价
+        f"const CNUS  ={json.dumps(cnus_list)};\n"
         f"const CFTC_NET={json.dumps(cftc_net)};\n"
         f"const CFTC_CHG={json.dumps(cftc_chg)};\n"
         f"const WTI_M15={json.dumps(wti_m15)};\n"
@@ -794,17 +972,23 @@ def update_index_html(history: list) -> bool:
         f"const BEI10Y={json.dumps(bei_arr)};\n"
         f"const TIPS10Y={json.dumps(tips_arr)};\n"
         f"const CN10Y_FRED={json.dumps(cn10y_fred_arr)};\n"
-        f"const CNUS_FRED={json.dumps(cnus_fred_arr)};\n"   # % 格式，正值
+        f"const CNUS_FRED={json.dumps(cnus_fred_arr)};\n"
         f"const SOFR_IORB={json.dumps(sofr_iorb_arr)};\n"
         f"const SOFR_EFFR={json.dumps(sofr_effr_arr)};\n"
         f"const FWD1X3={json.dumps(sofr_fwd1x3_arr)};\n"
         f"const FWD3X6={json.dumps(sofr_fwd3x6_arr)};\n"
         f"const SOFR_CURVE_SHAPE={json.dumps(sofr_curve_shape_arr)};\n"
         f"const SOFR_6M={json.dumps(sofr_6m_arr)};\n"
-        f"const WRESBAL={json.dumps(wresbal_arr_ff)};\n"    # B单位，约2994
+        f"const WRESBAL={json.dumps(wresbal_arr)};\n"
         f"const DW_ARR={json.dumps(dw_arr)};\n"
         f"const ONRRP={json.dumps(onrrp_arr)};\n"
-        f"const TGA_ARR={json.dumps(tga_arr)};\n\n"
+        f"const TGA_ARR={json.dumps(tga_arr)};\n"
+        f"const US_JP_2Y_SPREAD={json.dumps(us_jp_2y_arr)};\n"
+        f"const DXY_ARR={json.dumps(dxy_arr)};\n"
+        f"const USDJPY_ARR={json.dumps(usdjpy_arr)};\n"
+        f"const AUDJPY_ARR={json.dumps(audjpy_arr)};\n"
+        f"const DE_US_SPREAD={json.dumps(de_us_arr)};\n"
+        f"const IT_DE_SPREAD={json.dumps(it_de_arr)};\n\n"
         f"let data={{dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],"
         f"spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],"
         f"etf3110:[...ETF3110],ratio:[...RATIO],cnusSpread:[...CNUS],"
@@ -818,299 +1002,186 @@ def update_index_html(history: list) -> bool:
         f"fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6],"
         f"sofrCurveShape:[...SOFR_CURVE_SHAPE],sofr6m:[...SOFR_6M],"
         f"wresbal:[...WRESBAL],dw:[...DW_ARR],"
-        f"onrrp:[...ONRRP],tga:[...TGA_ARR]}};"
+        f"onrrp:[...ONRRP],tga:[...TGA_ARR],"
+        f"usJp2ySpread:[...US_JP_2Y_SPREAD],dxy:[...DXY_ARR],"
+        f"usdjpy:[...USDJPY_ARR],audjpy:[...AUDJPY_ARR],"
+        f"deUsSpread:[...DE_US_SPREAD],itDeSpread:[...IT_DE_SPREAD]}};"
     )
- 
+
     html = INDEX_HTML.read_text(encoding="utf-8")
     pattern = re.compile(r"const DATES=.*?let data=\{[^;]*\};", re.DOTALL)
     new_html, count = pattern.subn(new_block, html)
- 
+
     if count == 0:
         print("  WARNING: index.html 数据块未匹配，跳过")
         return False
- 
+
     INDEX_HTML.write_text(new_html, encoding="utf-8")
     print(f"  index.html: 已写入 {n} 条（最新 {today_str}）")
     return True
 
 
 # ────────────────────────────────────────────────────────────────────
-# 飞书推送 · 卡片1：港元流动性日报
+# 飞书推送 · 付鹏框架每日监控（统一卡片）
 # ────────────────────────────────────────────────────────────────────
-def _compute_macro_state(today: dict) -> dict:
-    """
-    基于付鹏框架，计算当日宏观状态（A/B/C/D/E）。
-    输入：history.json 最新一条记录。
-    输出：{state, score, label, portfolio_type, style}
-    """
-    score = 0.0
- 
-    # 维度1：利率曲线（权重0.25）
-    sp3m = today.get("spread_3m10y")   # % 格式
-    sp2y = today.get("spread_2y10y")
-    if sp3m is not None:
-        if sp3m > 1.5:   cs = 2.0
-        elif sp3m > 0.5: cs = 1.0
-        elif sp3m > 0.0: cs = 0.0
-        elif sp3m > -0.5:cs = -1.0
-        else:            cs = -2.0
-        # 2Y-10Y 辅助调整
-        if sp2y is not None and sp2y * sp3m < 0:
-            cs *= 0.7
-        score += cs * 0.25
- 
-    # 维度2：流动性压力（权重0.20）
-    si = today.get("sofr_iorb_bp", 0)
-    reserves_b = today.get("reserves_b")
-    if reserves_b is None:
-        reserves_t = today.get("reserves")
-        reserves_b = reserves_t * 1000 if reserves_t else None
-    ls = 0.0
-    if si is not None:
-        ls = -2.0 if si > 10 else (-1.0 if si > 5 else (0.5 if si < -5 else 0))
-    if reserves_b is not None:
-        if reserves_b < 2900:  ls -= 1.0
-        elif reserves_b > 3100: ls += 0.5
-    score += max(-2, min(2, ls)) * 0.20
- 
-    # 维度3：实际利率（权重0.20）
-    tips = today.get("tips_10y")
-    if tips is not None:
-        lvl = 1.5 if tips < 0 else (0.5 if tips < 1 else (-0.5 if tips < 2 else -1.5))
-        score += lvl * 0.4 * 0.20
-        # 趋势部分需要历史数据，此处用绝对水平代替
- 
-    # 维度4：信用/风险偏好（权重0.20）
-    # 用 VIX 代理
-    vix = today.get("vix")
-    if vix is not None:
-        rs = -1.5 if vix > 35 else (-0.5 if vix > 25 else (0.5 if vix < 15 else 0))
-        score += rs * 0.20
- 
-    # 维度5：HIBOR利差（港元流动性，权重0.15）
-    spread_bp = today.get("spread_bp")  # HIBOR-SOFR, 负=宽松
-    if spread_bp is not None:
-        hs = 1.0 if spread_bp < -50 else (0.5 if spread_bp < -10 else
-             (-1.0 if spread_bp > 30 else (-0.5 if spread_bp > 10 else 0)))
-        score += hs * 0.15
- 
-    # 状态判断
-    if score >= 2.0:
-        state, label, port, style = "A", "扩张期",      "钻头型", "成长"
-    elif score >= 0.5:
-        state, label, port, style = "B", "滞胀压力期",  "哑铃型", "价值"
-    elif score >= -0.5:
-        state, label, port, style = "C", "衰退前期",    "哑铃型(防御)", "偏价值"
-    elif score >= -2.5:
-        state, label, port, style = "E", "去杠杆期",    "锤子型", "防御"
-    else:
-        state, label, port, style = "D", "流动性危机",  "锤子型", "全防御"
- 
-    return {"state": state, "score": round(score, 2),
-            "label": label, "portfolio": port, "style": style}
- 
- 
-def _fetch_fx_latest() -> dict:
-    """用 yfinance 拉取 DXY / AUDJPY / USDJPY 最新收盘价。"""
-    result = {}
-    pairs = {"dxy": "DX-Y.NYB", "audjpy": "AUDJPY=X", "usdjpy": "USDJPY=X"}
-    for name, ticker in pairs.items():
-        try:
-            h = yf.Ticker(ticker).history(period="5d")
-            if not h.empty:
-                result[name] = round(float(h["Close"].iloc[-1]), 4)
-        except Exception as e:
-            print(f"   FX {ticker} ERROR: {e}")
-    return result
- 
- 
-def push_feishu_hibor(history: list, webhook_url: str) -> None:
-    if not webhook_url or len(history) < 1:
+def push_feishu_unified(history: list, webhook_url: str) -> None:
+    if not webhook_url or not history:
         print("  飞书推送：WEBHOOK_URL 未设置或无数据，跳过")
         return
- 
-    today = history[-1]
-    prev  = history[-2] if len(history) >= 2 else {}
-    d5    = history[-6] if len(history) >= 6 else {}
- 
-    # ── 宏观状态（BUG 3 FIX）────────────────────────────────────────
-    macro = _compute_macro_state(today)
-    state_icon = {"A": "🟢", "B": "🟡", "C": "🟠", "D": "🔴", "E": "🟤"}.get(macro["state"], "⚪")
- 
-    # ── 外汇数据（新增）────────────────────────────────────────────
-    fx = _fetch_fx_latest()
-    dxy_str    = f"{fx['dxy']:.2f}"    if "dxy"    in fx else "--"
-    usdjpy_str = f"{fx['usdjpy']:.2f}" if "usdjpy" in fx else "--"
-    audjpy_str = f"{fx['audjpy']:.2f}" if "audjpy" in fx else "--"
-    # AUDJPY 信号（风险偏好代理，付鹏框架洞一）
-    audjpy_val = fx.get("audjpy")
-    if audjpy_val is not None:
-        fx_icon = "🟢" if audjpy_val > 96 else ("🔴" if audjpy_val < 88 else "🟡")
-        fx_sig  = "风险偏好正常" if audjpy_val > 96 else ("风险厌恶" if audjpy_val < 88 else "中性")
-    else:
-        fx_icon, fx_sig = "⚪", "数据待接入"
- 
-    # ── 核心数值 ────────────────────────────────────────────────────
-    spread      = today.get("spread_bp")
-    spread_prev = prev.get("spread_bp")
-    spread_chg  = round(spread - spread_prev, 2) if (spread is not None and spread_prev is not None) else None
-    hibor  = today.get("hibor")
-    sofr   = today.get("sofr")
-    e3033  = today.get("etf3033")
-    e3110  = today.get("etf3110")
-    south  = today.get("south")
-    ratio  = round(e3033 / e3110, 4) if (e3033 and e3110) else None
- 
-    # ── WRESBAL（BUG 1 FIX：统一显示 B）────────────────────────────
-    reserves_b = today.get("reserves_b")
-    if reserves_b is None:
-        reserves_t = today.get("reserves")
-        reserves_b = round(reserves_t * 1000, 0) if reserves_t else None
-    res_str = f"{int(reserves_b):,}B" if reserves_b is not None else "--"
- 
-    # ── 利差信号 ────────────────────────────────────────────────────
+
+    rec = history[-1]
+
+    def fv(key, fmt=".2f", fallback="--"):
+        v = rec.get(key)
+        try:
+            return format(v, fmt) if v is not None else fallback
+        except Exception:
+            return fallback
+
+    # ── §1 港元流动性 ─────────────────────────────────────────────────
+    spread = rec.get("spread_bp")
     if spread is not None:
-        if   spread < -50: spread_signal, spread_icon = "港元极度宽松", "🟢"
-        elif spread < -10: spread_signal, spread_icon = "港元宽松",     "🟢"
-        elif spread >  30: spread_signal, spread_icon = "港元显著偏紧", "🔴"
-        elif spread >  10: spread_signal, spread_icon = "港元偏紧",     "🟡"
-        else:              spread_signal, spread_icon = "利差中性",     "⚪"
+        if   spread < -50: hk_icon, hk_sig, hk_st = "🟢", "港元极度宽松", "green"
+        elif spread < -10: hk_icon, hk_sig, hk_st = "🟢", "港元宽松",     "green"
+        elif spread <=  0: hk_icon, hk_sig, hk_st = "🟡", "利差中性",     "yellow"
+        elif spread <= 20: hk_icon, hk_sig, hk_st = "🟠", "港元偏紧",     "orange"
+        else:              hk_icon, hk_sig, hk_st = "🔴", "港元显著偏紧", "red"
     else:
-        spread_signal, spread_icon = "--", "⚪"
- 
-    # ── BUG 3 FIX: 港股信号 = 宏观状态 × HIBOR利差双重判断 ─────────
-    # 旧逻辑：只看 spread_bp → 全力做多（错误）
-    # 新逻辑：宏观状态 A/B 才允许做多，C/D/E 降仓
-    state = macro["state"]
-    hk_spread_ok = spread is not None and spread < -10   # HIBOR 宽松（必要条件）
- 
-    if state == "A" and hk_spread_ok:
-        hk_pos, hk_emoji = "积极做多3033，宏观+流动性双重确认", "🟢"
-    elif state == "A" and not hk_spread_ok:
-        hk_pos, hk_emoji = "宏观扩张但港元偏紧，半仓观望", "🟡"
-    elif state == "B" and hk_spread_ok:
-        hk_pos, hk_emoji = "哑铃配置：3033(成长端)+3110(防御端)各半", "🟡"
-    elif state == "B" and not hk_spread_ok:
-        hk_pos, hk_emoji = "滞胀期+港元偏紧，偏守3110", "🟠"
-    elif state == "C":
-        hk_pos, hk_emoji = "衰退前期，减持3033，增配3110防御", "🟠"
-    elif state in ("D", "E"):
-        hk_pos, hk_emoji = "锤子型：清仓风险资产，持现金/黄金", "🔴"
-    else:
-        hk_pos, hk_emoji = "数据不足，维持上期判断", "⚪"
-    # ───────────────────────────────────────────────────────────────
- 
-    # ── 南向 ────────────────────────────────────────────────────────
-    south_str  = f"{south:+.1f} 亿港元" if south is not None else "--"
-    south_icon = "🟢" if (south is not None and south > 0) else "🔴"
- 
-    # ── 美元流动性 ──────────────────────────────────────────────────
-    siorb    = today.get("sofr_iorb_bp")
-    dw       = today.get("dw")
-    dw_str   = f"{dw:.2f}B"      if dw      is not None else "--"
-    siorb_str = f"{siorb:+.1f}bp" if siorb  is not None else "--"
- 
-    usd_red    = (siorb is not None and siorb > 15) or (dw is not None and dw > 5)
-    usd_orange = (siorb is not None and siorb > 10) or (reserves_b is not None and reserves_b < 2900)
-    usd_yellow = (siorb is not None and siorb >  5) or (reserves_b is not None and reserves_b < 3100)
-    if   usd_red:    usd_icon, usd_sig = "🔴", "三重警戒·流动性紧张"
-    elif usd_orange: usd_icon, usd_sig = "🟠", "指标偏紧·关注共振"
-    elif usd_yellow: usd_icon, usd_sig = "🟡", "轻微偏紧·持续跟踪"
-    else:            usd_icon, usd_sig = "🟢", "美元流动性充裕"
- 
-    # ── 利率曲线 ────────────────────────────────────────────────────
-    spr2y10 = today.get("spread_2y10y")
-    spr_bp  = round(spr2y10 * 100, 1) if spr2y10 is not None else None
-    tips    = today.get("tips_10y")
-    # BUG 2 FIX: cnus_bp 现在是正值（US-CN），显示时标注方向
-    cnus_bp = today.get("cnus_bp")
-    if cnus_bp is not None:
-        cnus_str = f"US高于CN {cnus_bp:+.0f}bp" if cnus_bp > 0 else f"CN高于US {abs(cnus_bp):.0f}bp"
-    else:
-        cnus_str = "--"
- 
-    spr_str = f"{spr_bp:+.1f}bp" if spr_bp is not None else "--"
-    if spr_bp is not None:
-        if   spr_bp < -50: yc_icon, yc_sig = "🔴", "深度倒挂·衰退风险高"
-        elif spr_bp <   0: yc_icon, yc_sig = "🟠", "曲线倒挂·经济承压"
-        elif spr_bp <  20: yc_icon, yc_sig = "🟡", "曲线趋平·关注放缓"
-        else:              yc_icon, yc_sig = "🟢", "曲线正常·周期健康"
-    else:
-        yc_icon, yc_sig = "⚪", "数据待接入"
- 
-    # ── 综合信号 ────────────────────────────────────────────────────
-    # 用宏观状态直接映射综合建议
-    ov_map = {
-        "A": ("🟢", "宏观扩张·积极配置",     "green"),
-        "B": ("🟡", "滞胀压力·哑铃配置",     "yellow"),
-        "C": ("🟠", "衰退前期·降低仓位",     "orange"),
-        "D": ("🔴", "流动性危机·全面避险",   "red"),
-        "E": ("🟤", "去杠杆期·锤子型防御",   "orange"),
-    }
-    ov_icon, ov_label, ov_tpl = ov_map.get(state, ("⚪", "状态未知", "blue"))
- 
-    def _fv(key, fmt=".3f"):
-        v = today.get(key)
-        try: return format(v, fmt) if v is not None else "--"
-        except: return "--"
- 
-    # ── 各节内容 ────────────────────────────────────────────────────
-    sec_macro = (
-        f"**【第一层宏观状态】**\n"
-        f"{state_icon} 状态 **{state}（{macro['label']}）**  评分 {macro['score']:+.2f}\n"
-        f"配置型态: {macro['portfolio']}  |  风格偏向: {macro['style']}"
-    )
- 
+        hk_icon, hk_sig, hk_st = "⚪", "数据待接入", "na"
+
     sec_hk = (
         f"**【港元流动性】**\n"
-        f"HIBOR: {_fv('hibor')}% | SOFR: {_fv('sofr')}% | 利差: {spread_icon} {spread:+.1f}bp\n"
-        f"状态：{spread_icon} {spread_signal}"
-    ) if spread is not None else (
-        f"**【港元流动性】**\n数据待接入"
+        f"HIBOR: {fv('hibor','.3f')}% ｜ SOFR: {fv('sofr','.3f')}% ｜ 利差: {fv('spread_bp','+.1f')}bp\n"
+        f"状态：{hk_icon} {hk_sig}"
     )
- 
+
+    # ── §2 美元流动性 ─────────────────────────────────────────────────
+    siorb    = rec.get("sofr_iorb_bp")
+    reserves = rec.get("reserves")   # T
+    dw       = rec.get("dw")         # B
+    f1x3     = rec.get("sofr_fwd1x3")  # bp
+    f3x6     = rec.get("sofr_fwd3x6")  # bp
+
+    res_str  = f"{reserves:.2f}T" if reserves is not None else "--"
+    if f1x3 is not None and f3x6 is not None:
+        curve_label = "Contango" if f3x6 > f1x3 else "Backwardation"
+        curve_diff  = round(f3x6 - f1x3, 1)
+        curve_line  = f"曲线结构：1x3 {f1x3:+.1f}bp / 3x6 {f3x6:+.1f}bp / 差值 {curve_diff:+.1f}bp [{curve_label}]"
+    else:
+        curve_line  = "曲线结构：数据待接入"
+
+    usd_red    = (siorb is not None and siorb > 15) or (dw is not None and dw > 5)
+    usd_orange = (siorb is not None and siorb > 10) or (reserves is not None and reserves < 2.9) or (dw is not None and dw > 2)
+    usd_yellow = (siorb is not None and siorb > 5)  or (reserves is not None and reserves < 3.1)
+    if   usd_red:    usd_icon, usd_sig, usd_st = "🔴", "三重警戒·流动性紧张",   "red"
+    elif usd_orange: usd_icon, usd_sig, usd_st = "🟠", "指标偏紧·关注共振",     "orange"
+    elif usd_yellow: usd_icon, usd_sig, usd_st = "🟡", "轻微偏紧·持续跟踪",     "yellow"
+    else:            usd_icon, usd_sig, usd_st = "🟢", "美元流动性充裕",         "green"
+
     sec_usd = (
         f"**【美元流动性】**\n"
-        f"SOFR-IORB: {siorb_str} | WRESBAL: {res_str} | 贴现窗口: {dw_str}\n"
+        f"SOFR-IORB: {fv('sofr_iorb_bp','+.1f')}bp ｜ WRESBAL: {res_str} ｜ 贴现窗口: {fv('dw','.2f')}B\n"
+        f"{curve_line}\n"
         f"状态：{usd_icon} {usd_sig}"
     )
- 
+
+    # ── §3 外汇信号 ───────────────────────────────────────────────────
+    dxy      = rec.get("dxy")
+    uj_chg   = rec.get("usdjpy_1d_chg")   # %
+    aj_chg5  = rec.get("audjpy_5d_chg")   # %
+
+    uj_str = f"（日涨跌{uj_chg:+.2f}%）" if uj_chg is not None else ""
+    aj_str = f"（5日涨跌{aj_chg5:+.2f}%）" if aj_chg5 is not None else ""
+
+    fx_red    = (uj_chg is not None and uj_chg < -2.0) or (aj_chg5 is not None and aj_chg5 < -4.0)
+    fx_orange = (uj_chg is not None and uj_chg < -1.0) or (aj_chg5 is not None and aj_chg5 < -2.0) or (dxy is not None and dxy > 113)
+    fx_yellow = (uj_chg is not None and uj_chg < -0.5) or (aj_chg5 is not None and aj_chg5 < -1.0) or (dxy is not None and dxy > 108)
+    if   fx_red:    fx_icon, fx_sig, fx_st = "🔴", "Carry Trade崩溃·紧急避险",       "red"
+    elif fx_orange: fx_icon, fx_sig, fx_st = "🟠", "Carry Trade承压·降低风险敞口",   "orange"
+    elif fx_yellow: fx_icon, fx_sig, fx_st = "🟡", "Carry Trade松动·保持警惕",       "yellow"
+    else:           fx_icon, fx_sig, fx_st = "🟢", "Carry Trade稳定·情绪正常",       "green"
+
     sec_fx = (
         f"**【外汇信号】**\n"
-        f"DXY: {dxy_str} | USDJPY: {usdjpy_str} | AUDJPY: {audjpy_str}\n"
-        f"状态：{fx_icon} {fx_sig}（AUDJPY风险偏好代理）"
+        f"DXY: {fv('dxy','.2f')} ｜ USDJPY: {fv('usdjpy','.2f')}{uj_str} ｜ AUDJPY: {fv('audjpy','.2f')}{aj_str}\n"
+        f"状态：{fx_icon} {fx_sig}"
     )
- 
+
+    # ── §4 恒生科技 ───────────────────────────────────────────────────
+    e3033 = rec.get("etf3033")
+    e3110 = rec.get("etf3110")
+    south = rec.get("south")
+    ratio = round(e3033 / e3110, 4) if (e3033 and e3110) else None
+
+    south_flow = "净流入" if (south is not None and south > 0) else ("净流出" if (south is not None and south < 0) else "--")
+    south_str  = f"{south:+.1f}亿港元（{south_flow}）" if south is not None else "--"
+    ratio_str  = f"{ratio:.4f}" if ratio else "--"
+
+    # 恒科仓位建议（依赖 HIBOR-SOFR 利差，与 §1 同信号）
+    if   hk_st == "green"  and spread is not None and spread < -50: hk_pos = "全力做多3033 · 满仓+杠杆"
+    elif hk_st == "green":                                           hk_pos = "积极做多3033 · 七至满仓"
+    elif hk_st == "orange":                                          hk_pos = "半仓3033 · 观望"
+    elif hk_st == "red":                                             hk_pos = "减仓3033 · 转守3110"
+    else:                                                            hk_pos = "半仓3033 · 中性观望"
+
     sec_hst = (
-        f"**【恒生科技 · 港股方向】**\n"
-        f"3033: HK${_fv('etf3033')} | 3110: HK${_fv('etf3110')} | 比值: {f'{ratio:.4f}' if ratio else '--'}\n"
-        f"南向资金: {south_str}（{south_icon}）\n"
-        f"方向：{hk_emoji} {hk_pos}"
+        f"**【恒生科技】**\n"
+        f"3033: HK${fv('etf3033','.3f')} ｜ 3110: HK${fv('etf3110','.3f')} ｜ 比值: {ratio_str}\n"
+        f"南向资金: {south_str}\n"
+        f"状态：{hk_icon} {hk_pos}"
     )
- 
+
+    # ── §5 利率曲线 ───────────────────────────────────────────────────
+    spr2y10 = rec.get("spread_2y10y")   # % (10Y - 2Y)
+    spr_bp  = round(spr2y10 * 100, 1) if spr2y10 is not None else None
+
+    # 中美利差：cnus_bp = CN−US in bp；cnus_fred = US−CN in %（兼容两种存储）
+    cnus = rec.get("cnus_bp")
+    if cnus is None and rec.get("cnus_fred") is not None:
+        cnus = round(-rec["cnus_fred"] * 100, 1)
+    cnus_str = f"{cnus:+.1f}bp" if cnus is not None else "--"
+
+    if spr_bp is not None:
+        if   spr_bp < -50: yc_icon, yc_sig, yc_st = "🔴", "深度倒挂·衰退风险高",   "red"
+        elif spr_bp <   0: yc_icon, yc_sig, yc_st = "🟠", "曲线倒挂·经济承压",     "orange"
+        elif spr_bp <  20: yc_icon, yc_sig, yc_st = "🟡", "曲线趋平·关注放缓",     "yellow"
+        else:              yc_icon, yc_sig, yc_st = "🟢", "曲线正常·周期健康",     "green"
+    else:
+        yc_icon, yc_sig, yc_st = "⚪", "数据待接入", "na"
+
     sec_yc = (
         f"**【利率曲线】**\n"
-        f"2Y: {_fv('us_2y')}% | 10Y: {_fv('us_10y')}% | 2Y-10Y: {spr_str} | TIPS: {_fv('tips_10y')}%\n"
+        f"2Y: {fv('us_2y','.3f')}% ｜ 10Y: {fv('us_10y','.3f')}% ｜ "
+        f"2Y-10Y: {format(spr_bp,'+.1f') if spr_bp is not None else '--'}bp ｜ "
+        f"TIPS: {fv('tips_10y','.3f')}%\n"
         f"中美利差: {cnus_str}\n"
         f"状态：{yc_icon} {yc_sig}"
     )
- 
+
+    # ── 综合信号 ──────────────────────────────────────────────────────
+    scored = [s for s in [hk_st, usd_st, fx_st, yc_st] if s != "na"]
+    red_n, orange_n, yellow_n = scored.count("red"), scored.count("orange"), scored.count("yellow")
+
+    if   red_n > 0:                       ov_icon, ov_label, ov_tpl = "🔴", "全面避险·检查风险敞口",     "red"
+    elif orange_n > 0 or yellow_n >= 3:   ov_icon, ov_label, ov_tpl = "🟠", "降低仓位·控制回撤",         "orange"
+    elif yellow_n >= 1:                   ov_icon, ov_label, ov_tpl = "🟡", "保持关注·暂缓加仓",         "yellow"
+    else:                                 ov_icon, ov_label, ov_tpl = "🟢", "市场正常·维持仓位",         "green"
+
     sec_overall = (
         f"**【综合信号】**\n"
         f"{ov_icon} **{ov_label}**\n"
-        f"宏观:{state_icon}{state} | 港元:{spread_icon} | 美元:{usd_icon} | 外汇:{fx_icon} | 曲线:{yc_icon}"
+        f"（{hk_icon}港元 {usd_icon}美元流动性 {fx_icon}外汇 {yc_icon}利率曲线）"
     )
- 
+
+    # ── 构建卡片 ──────────────────────────────────────────────────────
+    date_str = rec.get("date", date.today().isoformat())
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
-            "title": {"tag": "plain_text",
-                      "content": f"📊 付鹏框架每日监控 · {today['date']}"},
+            "title": {"tag": "plain_text", "content": f"📊 付鹏框架每日监控 · {date_str}"},
             "template": ov_tpl,
         },
         "elements": [
-            {"tag": "div", "text": {"tag": "lark_md", "content": sec_macro}},
-            {"tag": "hr"},
             {"tag": "div", "text": {"tag": "lark_md", "content": sec_hk}},
             {"tag": "hr"},
             {"tag": "div", "text": {"tag": "lark_md", "content": sec_usd}},
@@ -1125,20 +1196,305 @@ def push_feishu_hibor(history: list, webhook_url: str) -> None:
             {
                 "tag": "note",
                 "elements": [{"tag": "plain_text",
-                               "content": f"数据来源：HKAB·FRED·东方财富·yfinance · 自动更新 {today['date']}"}],
+                               "content": f"数据来源：HKAB·FRED·akshare·yfinance · 自动更新 {date_str}"}]
             },
         ],
     }
- 
+
     try:
-        r = requests.post(
+        resp = requests.post(
             webhook_url,
             json={"msg_type": "interactive", "card": card},
-            timeout=15, verify=False
+            timeout=15, verify=False,
         )
-        if r.status_code == 200 and r.json().get("StatusCode") == 0:
+        if resp.status_code == 200 and resp.json().get("StatusCode") == 0:
             print("  飞书推送 OK（付鹏框架每日监控）")
         else:
-            print(f"  飞书推送失败: {r.status_code}  {r.text[:120]}")
+            print(f"  飞书推送失败: {resp.status_code}  {resp.text[:120]}")
     except Exception as e:
         print(f"  飞书推送异常: {e}")
+
+
+# ────────────────────────────────────────────────────────────────────
+# Main
+# ────────────────────────────────────────────────────────────────────
+def main():
+    print(f"\n{'═' * 58}")
+    print(f"  HIBOR · SOFR · ETF · 南向资金   {date.today()}")
+    print(f"{'═' * 58}\n")
+
+    today_str = date.today().isoformat()
+    record = {"date": today_str}
+    errors = []
+
+    # ── ① HIBOR ──────────────────────────────────────────────────────
+    print("① HIBOR 3M")
+    try:
+        h = fetch_hibor_3m()
+        record["hibor"] = h["rate"]
+        print(f"   {h['rate']:.4f}%  ({h['date']})  变动 {h['change_pct']:+.3f}%  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        # 向前填充：用 history.json 最近一条有效 hibor
+        hist_tmp = load_history()
+        last = next((r["hibor"] for r in reversed(hist_tmp) if r.get("hibor")), None)
+        if last:
+            record["hibor"] = last
+            print(f"   使用上次已知值 {last:.4f}%（填充）")
+        else:
+            errors.append("HIBOR")
+
+    # ── ② SOFR ───────────────────────────────────────────────────────
+    print("\n② Term SOFR 3M (FRED: SOFR90DAYAVG)")
+    try:
+        s = fetch_sofr_3m()
+        record["sofr"] = s["rate"]
+        print(f"   {s['rate']:.4f}%  ({s['date']})  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        # 向前填充：用 history.json 最近一条有效 sofr
+        hist_tmp = load_history()
+        last = next((r["sofr"] for r in reversed(hist_tmp) if r.get("sofr")), None)
+        if last:
+            record["sofr"] = last
+            print(f"   使用上次已知值 {last:.4f}%（填充）")
+        else:
+            errors.append("SOFR")
+
+    # ── ③ 美元流动性底层指标 ─────────────────────────────────────────────
+    print("\n③ 美元流动性底层指标")
+    try:
+        liq = fetch_liq_bundle()
+        for k, v in liq.items():
+            record[k] = v
+        parts = []
+        if "sofr_iorb_bp" in liq: parts.append(f"SOFR-IORB={liq['sofr_iorb_bp']:+.1f}bp")
+        if "reserves"     in liq: parts.append(f"WRESBAL={liq['reserves']:.3f}T")
+        if "dw"           in liq: parts.append(f"DW={liq['dw']:.2f}B")
+        if "onrrp"        in liq: parts.append(f"ONRRP={liq['onrrp']:.1f}B")
+        if "tga"          in liq: parts.append(f"TGA={liq['tga']:.3f}T")
+        if "srf"          in liq: parts.append(f"SRF={liq['srf']:.3f}B")
+        print(f"   {'  '.join(parts)}  ✓" if parts else "   (部分字段获取失败)")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        errors.append("LIQ_BUNDLE")
+
+    # SOFR 曲线形态（依赖 sofr=Term 3M + liq_bundle sofr_1m/sofr_6m）
+    s3m = record.get("sofr")
+    s1m = record.get("sofr_1m")
+    s6m = record.get("sofr_6m")
+    if s1m is not None and s3m is not None:
+        record["sofr_fwd1x3"] = round((s3m - s1m) * 100, 1)
+    if s6m is not None and s3m is not None:
+        record["sofr_fwd3x6"] = round((s6m - s3m) * 100, 1)
+    if "sofr_fwd1x3" in record and "sofr_fwd3x6" in record:
+        record["sofr_curve_shape"] = round(record["sofr_fwd1x3"] - record["sofr_fwd3x6"], 1)
+    if "sofr_curve_shape" in record:
+        print(f"   SOFR曲线 1x3={record.get('sofr_fwd1x3',0):+.1f}bp  "
+              f"3x6={record.get('sofr_fwd3x6',0):+.1f}bp  "
+              f"形态={record['sofr_curve_shape']:+.1f}bp")
+
+    # ── ④ ETF ────────────────────────────────────────────────────────
+    print("\n④ ETF 收盘价")
+    try:
+        etfs = fetch_etf_prices()
+        record["etf3033"] = etfs["3033.HK"]["close"]
+        record["etf3110"] = etfs["3110.HK"]["close"]
+        for tk, v in etfs.items():
+            print(f"   {tk}: HK${v['close']:.3f}  ({v['date']})  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        errors.append("ETF")
+
+    # ── ④ 南向 ───────────────────────────────────────────────────────
+    print("\n④ 南向资金")
+    try:
+        south = fetch_southbound()
+        record["south"] = south["net_flow_bn"]
+        label = "流入" if south["net_flow_bn"] > 0 else "流出"
+        print(f"   净买入 {south['net_flow_bn']:+.2f} 亿港元（{label}）"
+              f"  买 {south['buy_bn']:.1f}  卖 {south['sell_bn']:.1f}  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        errors.append("南向资金")
+
+    # ── ⑤ 中美利差 10Y CN−US ────────────────────────────────────────
+    print("\n⑤ 中美利差 10Y CN−US")
+    try:
+        cnus = fetch_cn_us_spread()
+        record["cnus_bp"] = cnus["spread_bp"]
+        print(f"   CN {cnus['cn10y']:.3f}%  US {cnus['us10y']:.3f}%"
+              f"  利差 {cnus['spread_bp']:+.1f}bp  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["cnus_bp"] for r in reversed(hist_tmp) if r.get("cnus_bp") is not None), None)
+        if last is not None:
+            record["cnus_bp"] = last
+            print(f"   使用上次已知值 {last:+.1f}bp（填充）")
+        else:
+            print("   无历史数据，跳过（非必要字段）")
+
+    # ── ⑥ CFTC 原油投机净多仓 ──────────────────────────────────────────
+    print("\n⑥ CFTC 原油投机净多仓（Legacy COT）")
+    try:
+        cftc = fetch_cftc_crude()
+        record["cftc_net"] = cftc["net_long"]
+        record["cftc_chg"] = cftc["chg"]
+        sign = "+" if cftc["chg"] >= 0 else ""
+        print(f"   净多仓 {cftc['net_long']:,}  WoW {sign}{cftc['chg']:,}"
+              f"  ({cftc['date']})  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in ("cftc_net", "cftc_chg"):
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+                print(f"   {fld} 使用上次已知值 {last}（填充）")
+
+    # ── ⑦ WTI 1-5月差 ─────────────────────────────────────────────────
+    print("\n⑦ WTI 1-5月差（CME期货）")
+    try:
+        ws = fetch_wti_spread()
+        record["wti_m15"] = ws["spread"]
+        structure = "Backwardation" if ws["spread"] > 0 else "Contango"
+        print(f"   M1 ${ws['front']:.2f}  M5 ${ws['m5']:.2f}"
+              f"  差 {ws['spread']:+.2f}  {structure}  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["wti_m15"] for r in reversed(hist_tmp)
+                     if r.get("wti_m15") is not None), None)
+        if last is not None:
+            record["wti_m15"] = last
+            print(f"   使用上次已知值 {last:+.2f}（填充）")
+
+    # ── ⑧ Brent−WTI 价差 ──────────────────────────────────────────────
+    print("\n⑧ Brent−WTI 价差")
+    try:
+        bwti = fetch_brent_wti()
+        record["brent_wti"] = bwti["spread"]
+        record["wti_price"] = bwti["wti"]
+        print(f"   Brent ${bwti['brent']:.2f}  WTI ${bwti['wti']:.2f}"
+              f"  差 {bwti['spread']:+.2f}  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in ("brent_wti", "wti_price"):
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+
+    # ── ⑨ VIX 指数 ────────────────────────────────────────────────────
+    print("\n⑨ VIX 指数")
+    try:
+        vix_d = fetch_vix()
+        record["vix"] = vix_d["vix"]
+        print(f"   VIX = {vix_d['vix']:.2f}  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        last = next((r["vix"] for r in reversed(hist_tmp)
+                     if r.get("vix") is not None), None)
+        if last is not None:
+            record["vix"] = last
+            print(f"   使用上次已知值 {last:.2f}（填充）")
+
+    # ── ⑩ 美债收益率曲线 ──────────────────────────────────────────────
+    print("\n⑩ 美债收益率曲线（FRED）")
+    _yield_fields = ("us_2y", "us_10y", "spread_2y10y", "spread_3m10y",
+                     "bei_10y", "tips_10y", "cn10y_fred", "cnus_fred")
+    try:
+        uy = fetch_us_yields()
+        for fld in _yield_fields:
+            record[fld] = uy[fld]
+        print(f"   2Y {uy['us_2y']:.3f}%  10Y {uy['us_10y']:.3f}%"
+              f"  2Y10Y {uy['spread_2y10y']:+.3f}%"
+              f"  3M10Y {uy['spread_3m10y']:+.3f}%"
+              f"  BEI {uy['bei_10y']:.3f}%  TIPS {uy['tips_10y']:.3f}%  ✓")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in _yield_fields:
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+                print(f"   {fld} 使用上次已知值 {last:.3f}（填充）")
+
+    # ── ⑪ 外汇信号 ────────────────────────────────────────────────────
+    print("\n⑪ 外汇信号（DXY / USDJPY / AUDJPY + 月频利差）")
+    try:
+        fx = fetch_fx_signals(
+            us_2y_val  = record.get("us_2y"),
+            us_10y_val = record.get("us_10y"),
+        )
+        _fx_fields = ("dxy", "usdjpy", "usdjpy_1d_chg", "audjpy", "audjpy_5d_chg",
+                      "jp_2y", "de_10y", "it_10y",
+                      "us_jp_2y_spread", "de_us_spread", "it_de_spread")
+        for fld in _fx_fields:
+            if fld in fx:
+                record[fld] = fx[fld]
+        parts = []
+        if fx.get("dxy"):          parts.append(f"DXY={fx['dxy']:.2f}")
+        if fx.get("usdjpy"):       parts.append(f"USDJPY={fx['usdjpy']:.2f}")
+        if fx.get("audjpy"):       parts.append(f"AUDJPY={fx['audjpy']:.2f}")
+        if fx.get("us_jp_2y_spread") is not None:
+            parts.append(f"美日2Y利差={fx['us_jp_2y_spread']:.3f}%")
+        if fx.get("de_us_spread") is not None:
+            parts.append(f"德美10Y={fx['de_us_spread']:.3f}%")
+        if fx.get("it_de_spread") is not None:
+            parts.append(f"德意10Y={fx['it_de_spread']:.3f}%")
+        print(f"   {'  '.join(parts)}  ✓" if parts else "   (部分字段获取失败)")
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        hist_tmp = load_history()
+        for fld in ("dxy", "usdjpy", "audjpy", "us_jp_2y_spread",
+                    "de_us_spread", "it_de_spread"):
+            last = next((r[fld] for r in reversed(hist_tmp)
+                         if r.get(fld) is not None), None)
+            if last is not None:
+                record[fld] = last
+
+    # ── 利差 ─────────────────────────────────────────────────────────
+    if "hibor" in record and "sofr" in record:
+        spread = (record["hibor"] - record["sofr"]) * 100
+        record["spread_bp"] = round(spread, 2)
+        signal = "港元宽松" if spread < -10 else ("港元偏紧" if spread > 10 else "利差中性")
+        print(f"\n  利差 HIBOR−SOFR : {spread:+.1f} bp  →  {signal}")
+
+    if "etf3033" in record and "etf3110" in record:
+        ratio = round(record["etf3033"] / record["etf3110"], 4)
+        print(f"  3033÷3110 比值  : {ratio:.4f}")
+
+    # ── 必要字段检查 ─────────────────────────────────────────────────
+    required = {"hibor", "etf3033", "etf3110"}
+    if not required.issubset(record.keys()):
+        missing = required - record.keys()
+        print(f"\n  ✗ 关键数据缺失 {missing}，不写入，退出")
+        sys.exit(1)
+
+    # ── 写入 ─────────────────────────────────────────────────────────
+    print("\n── 写入 ──────────────────────────────────────────────────")
+    history = load_history()
+    history = backfill_etf_history(history)      # 不足 60 条时自动回填 ETF 历史
+    history = backfill_yields_history(history)   # us_2y/cnus_fred 不足 60 条时回填
+    history = backfill_fx_history(history)       # dxy 不足 60 条时回填外汇信号历史
+    history = save_history(history, record)
+    update_index_html(history)
+
+    if errors:
+        print(f"\n  注意：{', '.join(errors)} 数据获取失败，其余已写入")
+    else:
+        print("\n  全部完成 ✓")
+
+    # ── 飞书推送 ──────────────────────────────────────────────────────
+    print("\n── 飞书推送 ────────────────────────────────────────────────")
+    push_feishu_unified(history, os.environ.get("WEBHOOK_URL", ""))
+
+
+if __name__ == "__main__":
+    main()
