@@ -1025,9 +1025,22 @@ def update_index_html(history: list) -> bool:
 # 飞书推送 · 付鹏框架每日监控（统一卡片）
 # ────────────────────────────────────────────────────────────────────
 def push_feishu_unified(history: list, webhook_url: str) -> None:
+    import traceback as _tb
+    try:
+        import urllib3; urllib3.disable_warnings()
+    except Exception:
+        pass
     if not webhook_url or not history:
         print("  飞书推送：WEBHOOK_URL 未设置或无数据，跳过")
         return
+    try:
+        _push_feishu_unified_inner(history, webhook_url)
+    except Exception as _e:
+        print(f"  飞书推送崩溃（未捕获异常）: {_e}")
+        _tb.print_exc()
+
+
+def _push_feishu_unified_inner(history: list, webhook_url: str) -> None:
 
     rec = history[-1]
 
@@ -1226,9 +1239,11 @@ def push_feishu_unified(history: list, webhook_url: str) -> None:
         if resp.status_code == 200 and resp.json().get("StatusCode") == 0:
             print("  飞书推送 OK（付鹏框架每日监控）")
         else:
-            print(f"  飞书推送失败: {resp.status_code}  {resp.text[:120]}")
+            print(f"  飞书推送失败: {resp.status_code}  {resp.text[:200]}")
     except Exception as e:
-        print(f"  飞书推送异常: {e}")
+        import traceback
+        print(f"  飞书推送 HTTP 异常: {e}")
+        traceback.print_exc()
 
 
 # ────────────────────────────────────────────────────────────────────
