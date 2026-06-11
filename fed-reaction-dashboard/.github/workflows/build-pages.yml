@@ -1,0 +1,45 @@
+name: Build Dashboard Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "fed_reaction_dashboard.md"
+      - "data/**"
+      - "scripts/build_site.py"
+      - ".github/workflows/build-pages.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-pages:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Build website
+        run: |
+          python scripts/build_site.py
+
+      - name: Commit generated docs
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add docs/
+          git diff --cached --quiet || git commit -m "Build dashboard pages [skip ci]"
+          git push
