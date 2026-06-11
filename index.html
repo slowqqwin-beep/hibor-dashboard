@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIBOR · SOFR · 恒生科技 监控台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400&display=swap');
+  :root {
+    --bg:#0a0c0f; --bg2:#111418; --bg3:#181c22;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --text:#e2e4e8; --muted:#6b7280; --dim:#3d4350;
+    --teal:#2dd4bf; --teal-dim:rgba(45,212,191,0.12);
+    --amber:#fbbf24; --amber-dim:rgba(251,191,36,0.12);
+    --red:#f87171; --red-dim:rgba(248,113,113,0.1);
+    --green:#4ade80; --green-dim:rgba(74,222,128,0.1);
+    --blue:#60a5fa; --purple:#a78bfa; --pink:#f472b6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;min-height:100vh;padding:28px 24px;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;z-index:0;}
+  .container{position:relative;z-index:1;max-width:1280px;margin:0 auto;}
+
+  /* header */
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;}
+  .header-left h1{font-family:'Noto Serif SC',serif;font-size:22px;font-weight:300;letter-spacing:0.04em;color:#fff;margin-bottom:4px;}
+  .header-left p{color:var(--muted);font-size:11px;letter-spacing:0.08em;}
+  .header-right{text-align:right;}
+  .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:6px;animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .update-time{font-size:11px;color:var(--muted);}
+
+  /* section label */
+  .section-label{font-size:10px;color:var(--dim);letter-spacing:0.14em;text-transform:uppercase;margin:20px 0 10px;padding-left:2px;border-left:2px solid var(--dim);padding-left:8px;}
+
+  /* kpi row */
+  .kpi-row{display:grid;gap:10px;margin-bottom:4px;}
+  .kpi-row-4{grid-template-columns:repeat(4,1fr);}
+  .kpi-row-5{grid-template-columns:repeat(5,1fr);}
+  .kpi-row-3{grid-template-columns:repeat(3,1fr);}
+  .kpi{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color .2s;}
+  .kpi:hover{border-color:var(--border2);}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;}
+  .kpi.teal::before{background:linear-gradient(90deg,transparent,var(--teal),transparent);}
+  .kpi.amber::before{background:linear-gradient(90deg,transparent,var(--amber),transparent);}
+  .kpi.red::before{background:linear-gradient(90deg,transparent,var(--red),transparent);}
+  .kpi.green::before{background:linear-gradient(90deg,transparent,var(--green),transparent);}
+  .kpi.blue::before{background:linear-gradient(90deg,transparent,var(--blue),transparent);}
+  .kpi.purple::before{background:linear-gradient(90deg,transparent,var(--purple),transparent);}
+  .kpi.pink::before{background:linear-gradient(90deg,transparent,var(--pink),transparent);}
+  .kpi.orange::before{background:linear-gradient(90deg,transparent,#fb923c,transparent);}
+  .kpi-label{font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+  .kpi-val{font-size:26px;font-weight:500;line-height:1;margin-bottom:3px;}
+  .kpi.teal .kpi-val{color:var(--teal);}
+  .kpi.amber .kpi-val{color:var(--amber);}
+  .kpi.red .kpi-val{color:var(--red);}
+  .kpi.green .kpi-val{color:var(--green);}
+  .kpi.blue .kpi-val{color:var(--blue);}
+  .kpi.purple .kpi-val{color:var(--purple);}
+  .kpi.pink .kpi-val{color:var(--pink);}
+  .kpi.orange .kpi-val{color:#fb923c;}
+  .kpi-sub{font-size:10px;color:var(--muted);}
+  .signal{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:4px;font-size:10px;font-weight:500;letter-spacing:0.06em;margin-top:7px;}
+  .signal.bullish{background:var(--green-dim);color:var(--green);border:0.5px solid rgba(74,222,128,0.2);}
+  .signal.bearish{background:var(--red-dim);color:var(--red);border:0.5px solid rgba(248,113,113,0.2);}
+  .signal.neutral{background:var(--teal-dim);color:var(--teal);border:0.5px solid rgba(45,212,191,0.2);}
+  .signal.warning{background:var(--amber-dim);color:var(--amber);border:0.5px solid rgba(251,191,36,0.2);}
+  /* 流动性底层 */
+  .liq-badge{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:500;letter-spacing:0.06em;margin-bottom:10px;border:0.5px solid;width:fit-content;}
+  .liq-badge.green{background:var(--green-dim);color:var(--green);border-color:rgba(74,222,128,0.25);}
+  .liq-badge.amber{background:var(--amber-dim);color:var(--amber);border-color:rgba(251,191,36,0.25);}
+  .liq-badge.red{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,0.25);}
+  .liq-badge.red.blink{animation:liqblink 1s infinite;}
+  @keyframes liqblink{0%,100%{opacity:1}50%{opacity:0.35}}
+  /* 三重共振卡 */
+  .resonance-card{padding:12px 18px;border-radius:8px;margin:10px 0;border:0.5px solid;}
+  .resonance-card.green{background:var(--green-dim);color:var(--green);border-color:rgba(74,222,128,0.25);}
+  .resonance-card.amber{background:var(--amber-dim);color:var(--amber);border-color:rgba(251,191,36,0.25);}
+  .resonance-card.orange{background:rgba(251,146,60,0.08);color:#fb923c;border-color:rgba(251,146,60,0.25);}
+  .resonance-card.red{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,0.25);}
+  .resonance-card.red.blink{animation:liqblink 1s infinite;}
+  .kpi-threshold{font-size:9px;color:var(--dim);margin-top:4px;}
+
+  /* charts */
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  .chart-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .chart-card.full{grid-column:1/-1;}
+  .card-title{font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:14px;}
+  .chart-wrap{position:relative;height:170px;}
+  .chart-wrap-md{position:relative;height:190px;}
+  .chart-wrap-lg{position:relative;height:210px;}
+
+  /* spread bar */
+  .spread-bar-wrap{margin:10px 0 6px;}
+  .spread-bar-track{background:var(--bg3);border-radius:4px;height:7px;overflow:hidden;}
+  .spread-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+  .spread-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px;}
+
+  /* ratio gauge */
+  .ratio-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+  .ratio-label{font-size:10px;color:var(--muted);white-space:nowrap;}
+  .ratio-track{flex:1;background:var(--bg3);border-radius:4px;height:7px;overflow:hidden;}
+  .ratio-fill{height:100%;border-radius:4px;background:var(--purple);transition:width .5s;}
+  .ratio-val{font-size:11px;color:var(--purple);min-width:42px;text-align:right;}
+
+  /* table */
+  .data-table{width:100%;border-collapse:collapse;font-size:11px;}
+  .data-table th{color:var(--muted);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;padding:5px 7px;border-bottom:0.5px solid var(--border);text-align:right;}
+  .data-table th:first-child{text-align:left;}
+  .data-table td{padding:6px 7px;border-bottom:0.5px solid var(--border);color:var(--text);text-align:right;}
+  .data-table td:first-child{text-align:left;color:var(--muted);}
+  .data-table tr:last-child td{border-bottom:none;}
+  .data-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .pos{color:var(--green);} .neg{color:var(--red);} .neu{color:var(--amber);}
+
+
+  /* interp */
+  .interp{background:var(--bg3);border-left:2px solid var(--teal);border-radius:0 6px 6px 0;padding:10px 13px;font-size:11px;color:var(--muted);line-height:1.75;margin-top:12px;}
+  .interp strong{color:var(--text);font-weight:500;}
+
+  .footer{margin-top:20px;padding-top:14px;border-top:0.5px solid var(--border);font-size:10px;color:var(--dim);display:flex;justify-content:space-between;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>HIBOR · SOFR · 恒生科技 监控台</h1>
+      <p>HONG KONG LIQUIDITY + ETF RELATIVE STRENGTH · 付鹏框架辅助工具 v2</p>
+    </div>
+    <div class="header-right">
+      <div><span class="live-dot"></span><span class="update-time" id="updateTime">数据已加载</span></div>
+      <div style="margin-top:5px;font-size:10px;color:var(--dim)">日级更新 · 内置演示数据</div>
+    </div>
+  </div>
+
+  <!-- ① 利率区 -->
+  <div class="section-label">① 港元流动性</div>
+  <div class="kpi-row kpi-row-5" style="margin-bottom:10px;">
+    <div class="kpi teal">
+      <div class="kpi-label">HIBOR 3M</div>
+      <div class="kpi-val" id="kpi-hibor">—</div>
+      <div class="kpi-sub">港元3个月同业拆借</div>
+      <div class="signal neutral" id="sig-hibor">— 加载中</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-label">Term SOFR 3M</div>
+      <div class="kpi-val" id="kpi-sofr">—</div>
+      <div class="kpi-sub">美元3个月基准</div>
+      <div class="signal warning" id="sig-sofr">参照基准</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">利差 HIBOR−SOFR</div>
+      <div class="kpi-val" id="kpi-spread">—</div>
+      <div class="kpi-sub">核心流动性信号</div>
+      <div class="signal neutral" id="sig-spread">— 计算中</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">南向资金（今日）</div>
+      <div class="kpi-val" id="kpi-south">—</div>
+      <div class="kpi-sub">亿港元，净买入</div>
+      <div class="signal neutral" id="sig-south">— 计算中</div>
+    </div>
+    <div class="kpi teal" id="kpi-sofrcrv-card">
+      <div class="kpi-label">SOFR 曲线 / 前瞻</div>
+      <div class="kpi-val" id="kpi-sofr6m">—</div>
+      <div class="kpi-sub">6M Term SOFR</div>
+      <div style="margin-top:7px;font-size:11px;color:var(--muted);">
+        1x3&nbsp;<span id="kpi-fwd13" style="font-weight:500;">—</span>
+        &nbsp;·&nbsp;
+        3x6&nbsp;<span id="kpi-fwd36" style="font-weight:500;">—</span>
+      </div>
+      <div class="signal neutral" id="sig-sofrcrv">— 计算中</div>
+    </div>
+  </div>
+
+  <!-- ② ETF区 -->
+  <div class="section-label">② ETF 相对强弱 · 3033 恒生科技 vs 3110 恒生高股息</div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:10px;">
+    <div class="kpi blue">
+      <div class="kpi-label">3033 恒生科技 ETF</div>
+      <div class="kpi-val" id="kpi-3033">—</div>
+      <div class="kpi-sub">港元，收盘价</div>
+      <div class="signal neutral" id="sig-3033">— 加载中</div>
+    </div>
+    <div class="kpi pink">
+      <div class="kpi-label">3110 恒生高股息 ETF</div>
+      <div class="kpi-val" id="kpi-3110">—</div>
+      <div class="kpi-sub">港元，收盘价</div>
+      <div class="signal neutral" id="sig-3110">— 加载中</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">价差比值 3033÷3110</div>
+      <div class="kpi-val" id="kpi-ratio">—</div>
+      <div class="kpi-sub">科技/红利相对强弱</div>
+      <div class="signal neutral" id="sig-ratio">— 计算中</div>
+    </div>
+  </div>
+
+  <!-- ③ 美元流动性底层指标 -->
+  <div class="section-label">③ 美元流动性底层指标 · SOFR-IORB / 准备金 / 贴现窗口 / TIPS</div>
+  <!-- 联动状态徽章 -->
+  <div class="liq-badge green" id="liq-badge">
+    <span id="liq-badge-dot">●</span>
+    <span id="liq-badge-text">— 计算中</span>
+  </div>
+  <!-- 5张KPI卡 -->
+  <div class="kpi-row kpi-row-5" style="margin-bottom:10px;">
+    <!-- SOFR-IORB -->
+    <div class="kpi green" id="kpi-sofr-iorb-card">
+      <div class="kpi-label">SOFR − IORB 利差</div>
+      <div class="kpi-val" id="kpi-sofr-iorb">—</div>
+      <div class="kpi-sub">隔夜流动性 · SOFR时代流动性监测</div>
+      <div class="signal neutral" id="sig-sofr-iorb">— 计算中</div>
+    </div>
+    <!-- SOFR-EFFR -->
+    <div class="kpi green" id="kpi-sofr-effr-card">
+      <div class="kpi-label">SOFR − EFFR 利差</div>
+      <div class="kpi-val" id="kpi-sofr-effr">—</div>
+      <div class="kpi-sub">bp · 货币市场压力</div>
+      <div class="signal neutral" id="sig-sofr-effr">— 计算中</div>
+    </div>
+    <!-- WRESBAL -->
+    <div class="kpi blue" id="kpi-wresbal-card">
+      <div class="kpi-label">银行准备金 WRESBAL</div>
+      <div class="kpi-val" id="kpi-wresbal">—</div>
+      <div class="kpi-sub">万亿美元 · 周频</div>
+      <div class="kpi-threshold" id="kpi-wresbal-dist">距3.0T: —</div>
+      <div class="signal neutral" id="sig-wresbal">— 计算中</div>
+    </div>
+    <!-- DW -->
+    <div class="kpi amber" id="kpi-dw-card">
+      <div class="kpi-label">贴现窗口 DPCREDIT</div>
+      <div class="kpi-val" id="kpi-dw">—</div>
+      <div class="kpi-sub">十亿美元 · 周频</div>
+      <div class="kpi-threshold" id="kpi-dw-chg">较上周: —</div>
+      <div class="signal neutral" id="sig-dw">— 计算中</div>
+    </div>
+    <!-- TIPS 10Y -->
+    <div class="kpi purple" id="kpi-tips-card">
+      <div class="kpi-label">10Y TIPS 实际利率</div>
+      <div class="kpi-val" id="kpi-tips">—</div>
+      <div class="kpi-sub">% · DFII10 日频</div>
+      <div class="kpi-threshold">↑压制科技估值 · ↓利好黄金</div>
+      <div class="signal neutral" id="sig-tips">— 计算中</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">HIBOR 3M vs Term SOFR 3M · 近60日</div>
+      <div class="chart-wrap"><canvas id="chartRates"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">HIBOR−SOFR 利差 (bp) · 近60日</div>
+      <div class="chart-wrap"><canvas id="chartSpread"></canvas></div>
+      <div class="spread-bar-wrap">
+        <div class="spread-bar-track"><div class="spread-bar-fill" id="spreadBar" style="width:50%"></div></div>
+        <div class="spread-labels"><span>宽松 −50bp</span><span>中性 0</span><span>偏紧 +50bp</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2: ETF -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">3033 恒生科技 · 3110 恒生高股息 价格走势</div>
+      <div class="chart-wrap-md"><canvas id="chartETF"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">3033÷3110 比值 · 科技/红利相对强弱</div>
+      <div class="chart-wrap-md"><canvas id="chartRatio"></canvas></div>
+      <div class="ratio-row">
+        <span class="ratio-label">当前分位（60日）</span>
+        <div class="ratio-track"><div class="ratio-fill" id="ratioBar" style="width:50%"></div></div>
+        <span class="ratio-val" id="ratioBarLabel">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Row 3: 联动 -->
+  <div class="charts-grid">
+    <div class="chart-card full">
+      <div class="card-title">核心联动：HIBOR−SOFR 利差 vs 3033÷3110 比值 vs 南向资金</div>
+      <div class="chart-wrap-lg"><canvas id="chartOverlay"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Chart Row 4: 利率压力双指标 -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">利率压力双指标 · SOFR-IORB &amp; 10Y TIPS · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartLiqPressure"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">准备金 + 贴现窗口 · 周频确认 · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartReserves"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 三重共振信号 -->
+  <div class="resonance-card green" id="resonance-card">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:13px;font-weight:700;letter-spacing:0.05em;">流动性三重共振</span>
+      <span style="font-size:12px;font-weight:600;" id="resonance-text">— 计算中</span>
+    </div>
+    <div style="font-size:10px;color:inherit;opacity:0.7;margin-top:5px;" id="resonance-detail">① SOFR曲线Back(1x3>3x6) · ② SOFR-IORB>5bp · ③ SOFR-EFFR>5bp</div>
+  </div>
+
+  <!-- ④ 利率曲线 -->
+  <div class="section-label">④ 美债利率曲线 · 2Y / 10Y / 利差 / BEI / 中美利差</div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:8px;">
+    <div class="kpi red" id="kpi-sp2y10y-card">
+      <div class="kpi-label">2Y−10Y 利差</div>
+      <div class="kpi-val" id="kpi-sp2y10y">—</div>
+      <div class="kpi-sub">T10Y2Y · % · 期限溢价</div>
+      <div class="signal neutral" id="sig-sp2y10y">— 计算中</div>
+    </div>
+    <div class="kpi blue" id="kpi-us2y-card">
+      <div class="kpi-label">2Y 美债收益率</div>
+      <div class="kpi-val" id="kpi-us2y">—</div>
+      <div class="kpi-sub">DGS2 · %</div>
+      <div class="signal neutral" id="sig-us2y">— 加载中</div>
+    </div>
+    <div class="kpi teal" id="kpi-us10y-card">
+      <div class="kpi-label">10Y 美债收益率</div>
+      <div class="kpi-val" id="kpi-us10y">—</div>
+      <div class="kpi-sub">DGS10 · %</div>
+      <div class="signal neutral" id="sig-us10y">— 加载中</div>
+    </div>
+  </div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:10px;">
+    <div class="kpi red" id="kpi-sp3m10y-card">
+      <div class="kpi-label">3M−10Y 利差</div>
+      <div class="kpi-val" id="kpi-sp3m10y">—</div>
+      <div class="kpi-sub">T10Y3M · % · 衰退预警</div>
+      <div class="signal neutral" id="sig-sp3m10y">— 计算中</div>
+    </div>
+    <div class="kpi amber" id="kpi-bei10y-card">
+      <div class="kpi-label">10Y BEI 通胀预期</div>
+      <div class="kpi-val" id="kpi-bei10y">—</div>
+      <div class="kpi-sub">T10YIE · %</div>
+      <div class="signal neutral" id="sig-bei10y">— 计算中</div>
+    </div>
+    <div class="kpi green" id="kpi-cnus-fred-card">
+      <div class="kpi-label">中美利差 US−CN 10Y</div>
+      <div class="kpi-val" id="kpi-cnus-fred">—</div>
+      <div class="kpi-sub">DGS10 − IRLTLT01CNM156N · %</div>
+      <div class="signal neutral" id="sig-cnus-fred">— 计算中</div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">2Y / 10Y 美债收益率 · 近60日</div>
+      <div class="chart-wrap"><canvas id="chartYields"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">2Y−10Y 利差 / 3M−10Y 利差 · 近60日（%）</div>
+      <div class="chart-wrap"><canvas id="chartYieldSpreads"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-title">BEI 10Y 通胀预期 · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartBei"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">中美利差 US−CN 10Y (FRED) · 近60日</div>
+      <div class="chart-wrap-md"><canvas id="chartCnUs"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="chart-card" style="margin-bottom:10px;">
+    <div class="card-title">近期数据明细</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>HIBOR</th>
+          <th>SOFR</th>
+          <th>利差(bp)</th>
+          <th>3033</th>
+          <th>3110</th>
+          <th>比值</th>
+          <th>南向(亿)</th>
+          <th>综合信号</th>
+        </tr>
+      </thead>
+      <tbody id="dataTable"></tbody>
+    </table>
+    <div class="interp" id="interp">正在生成解读...</div>
+  </div>
+
+
+  <div class="footer">
+    <span>仅供研究参考，不构成投资建议</span>
+    <span>付鹏宏观框架辅助工具 v2.0 · HIBOR·SOFR·3033·3110</span>
+  </div>
+</div>
+
+<script>
+// ── 生成日期序列 ──
+function genDates(n){
+  const d=new Date(),arr=[];
+  for(let i=n-1;i>=0;i--){const dd=new Date(d);dd.setDate(d.getDate()-i);arr.push(dd.toISOString().slice(0,10));}
+  return arr;
+}
+// ── 实时数据（fetch_data.py 写入 2026-03-25）──
+// ── 实时数据（backfill.py 写入 2026-03-25）──
+// ── 实时数据（fetch_data.py 写入 2026-03-25）──
+// ── 实时数据（fetch_data.py 写入 2026-03-25）──
+// ── 实时数据（backfill.py 写入 2026-03-25）──
+// ── 实时数据（backfill.py 写入 2026-03-26）──
+// ── 实时数据（fetch_data.py 写入 2026-03-26）──
+// ── 实时数据（fetch_data.py 写入 2026-03-26）──
+// ── 实时数据（fetch_data.py 写入 2026-03-26）──
+// ── 实时数据（fetch_data.py 写入 2026-03-26）──
+// ── 实时数据（fetch_data.py 写入 2026-03-27）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（backfill.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-28）──
+// ── 实时数据（fetch_data.py 写入 2026-03-29）──
+// ── 实时数据（fetch_data.py 写入 2026-03-30）──
+// ── 实时数据（fetch_data.py 写入 2026-03-30）──
+// ── 实时数据（fetch_data.py 写入 2026-03-31）──
+// ── 实时数据（fetch_data.py 写入 2026-03-31）──
+// ── 实时数据（backfill.py 写入 2026-04-01）──
+const DATES=["2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-19", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-16", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"];
+const HIBOR=[2.99071, 2.97262, 2.99524, 2.9125, 2.89, 2.83411, 2.80071, 2.90423, 2.86244, 2.84286, 2.85589, 2.83273, 2.90566, 2.88506, 2.85637, 2.84786, 2.83917, 2.82298, 2.82595, 2.77441, 2.74839, 2.74179, 2.7775, 2.78363, 2.75625, 2.73363, 2.70375, 2.68577, 2.68649, 2.67887, 2.67512, 2.63887, 2.58887, 2.57679, 2.6, 2.58363, 2.52887, 2.48577, 2.59202, 2.58435, 2.46589, 2.4303, 2.38917, 2.36185, 2.37226, 2.37744, 2.36464, 2.35446, 2.34, 2.3506, 2.34238, 2.32911, 2.30113, 2.3431, 2.51679, 2.53119, 2.53119, 2.53119, 2.41179, 2.35661];
+const SOFR =[3.98438, 3.97922, 3.97383, 3.96813, 3.95097, 3.94479, 3.93761, 3.93021, 3.92439, 3.92439, 3.90025, 3.89385, 3.88701, 3.88029, 3.86009, 3.8528, 3.84596, 3.84147, 3.83509, 3.81792, 3.81445, 3.81198, 3.80895, 3.80582, 3.79583, 3.79225, 3.78854, 3.78462, 3.78126, 3.78126, 3.76062, 3.75119, 3.74727, 3.74301, 3.73875, 3.73371, 3.7189, 3.71554, 3.71274, 3.70993, 3.70692, 3.69727, 3.69413, 3.69121, 3.69099, 3.69077, 3.68919, 3.6893, 3.68886, 3.68841, 3.68797, 3.68639, 3.68594, 3.68561, 3.68538, 3.68416, 3.68416, 3.68416, 3.67967, 3.67967];
+const SPREAD=[-99.37, -100.66, -97.86, -105.56, -106.1, -111.07, -113.69, -102.6, -106.19, -108.15, -104.44, -106.11, -98.13, -99.52, -100.37, -100.49, -100.68, -101.85, -100.91, -104.35, -106.61, -107.02, -103.14, -102.22, -103.96, -105.86, -108.48, -109.88, -109.48, -110.24, -108.55, -111.23, -115.84, -116.62, -113.88, -115.01, -119.0, -122.98, -112.07, -112.56, -124.1, -126.7, -130.5, -132.94, -131.87, -131.33, -132.45, -133.48, -134.89, -133.78, -134.56, -135.73, -138.48, -134.25, -116.86, -115.3, -115.3, -115.3, -126.79, -132.31];
+const SOUTH =[28.79, 91.78, -49.01, 68.15, 73.06, 12.96, 28.65, -15.15, 0.94, 22.92, 36.63, 139.3, 52.39, -16.01, -8.26, -6.35, -34.27, 43.74, 32.22, 19.07, 9.52, 133.73, 249.77, 148.59, -18.87, 0.85, 48.16, 45.67, 202.19, 0.0, 0.0, 0.0, 31.31, -40.57, -73.66, 149.97, 162.14, 60.81, -4.66, -277.35, -21.88, 372.13, -179.53, 34.48, 112.83, 184.49, -12.5, -114.81, 12.17, 261.9, -210.05, 297.28, -273.61, 223.23, 33.4, -28.83, -28.83, -28.83, -24.67, 7.03];
+const ETF3033=[5.7, 5.625, 5.555, 5.565, 5.74, 5.74, 5.77, 5.705, 5.7, 5.63, 5.565, 5.62, 5.64, 5.67, 5.605, 5.63, 5.77, 5.71, 5.605, 5.4, 5.345, 5.25, 5.28, 5.23, 5.3, 5.325, 5.38, 5.295, 5.24, 5.25, 5.105, 5.29, 5.145, 5.14, 5.0, 5.03, 4.89, 4.762, 4.72, 4.692, 4.836, 4.822, 4.946, 4.936, 4.924, 4.87, 4.998, 4.998, 5.0, 4.88, 4.77, 4.606, 4.718, 4.82, 4.656, 4.68, 4.68, 4.68, 4.59, 4.55];
+const ETF3110=[30.4353, 30.4552, 30.4155, 30.5741, 30.7328, 30.8517, 30.7922, 30.9112, 30.7724, 30.7526, 30.8716, 30.931, 31.2086, 31.0897, 31.3871, 31.5655, 32.2, 32.6759, 32.1603, 31.7241, 32.0017, 32.5172, 32.5371, 32.5172, 32.8345, 33.0922, 33.2905, 33.3103, 32.8543, 33.1716, 33.2509, 33.8655, 33.806, 33.806, 33.5285, 33.806, 33.7267, 33.6078, 33.0922, 33.2707, 33.4095, 32.9534, 33.0526, 33.4293, 33.4888, 33.1517, 33.0129, 33.1716, 33.35, 32.894, 32.7155, 31.625, 32.2, 32.48, 31.92, 32.06, 32.06, 32.06, 31.94, 31.54];
+const RATIO=[0.1873, 0.1847, 0.1826, 0.182, 0.1868, 0.1861, 0.1874, 0.1846, 0.1852, 0.1831, 0.1803, 0.1817, 0.1807, 0.1824, 0.1786, 0.1784, 0.1792, 0.1747, 0.1743, 0.1702, 0.167, 0.1615, 0.1623, 0.1608, 0.1614, 0.1609, 0.1616, 0.159, 0.1595, 0.1583, 0.1535, 0.1562, 0.1522, 0.152, 0.1491, 0.1488, 0.145, 0.1417, 0.1426, 0.141, 0.1447, 0.1463, 0.1496, 0.1477, 0.147, 0.1469, 0.1514, 0.1507, 0.1499, 0.1484, 0.1458, 0.1456, 0.1465, 0.1484, 0.1459, 0.146, 0.146, 0.146, 0.1437, 0.1443];
+
+let data={dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],etf3110:[...ETF3110],ratio:[...RATIO]};
+
+// ── 图表共用配置 ──
+const mono="'IBM Plex Mono',monospace";
+Chart.defaults.color='#6b7280';
+Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+Chart.defaults.font.family=mono;
+Chart.defaults.font.size=10;
+
+function tt(color){return{backgroundColor:'#181c22',borderColor:color,borderWidth:0.5,titleColor:'#e2e4e8',bodyColor:'#9ca3af',padding:8,displayColors:false};}
+const baseScales={
+  x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{maxTicksLimit:8,maxRotation:0}},
+  y:{grid:{color:'rgba(255,255,255,0.04)'}}
+};
+const baseOpts={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:baseScales,elements:{point:{radius:0,hoverRadius:4}}};
+
+let chartRates,chartSpread,chartETF,chartRatio,chartOverlay,chartLiqPressure,chartReserves;
+let chartYields,chartYieldSpreads,chartBei,chartCnUs;
+
+function initCharts(){
+  const labels=data.dates;
+
+  // 1. HIBOR vs SOFR
+  chartRates=new Chart(document.getElementById('chartRates'),{
+    type:'line',data:{labels,datasets:[
+      {label:'HIBOR 3M',data:data.hibor,borderColor:'#2dd4bf',borderWidth:1.5,tension:0.4,fill:false},
+      {label:'Term SOFR 3M',data:data.sofr,borderColor:'#fbbf24',borderWidth:1.5,tension:0.4,borderDash:[4,3],fill:false}
+    ]},
+    options:{...baseOpts,plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#2dd4bf'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y.toFixed(3)}%`}}},
+    scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+
+  // 2. Spread bar chart
+  const spColors=data.spread.map(s=>s<-10?'rgba(74,222,128,0.7)':s>10?'rgba(248,113,113,0.7)':'rgba(45,212,191,0.7)');
+  chartSpread=new Chart(document.getElementById('chartSpread'),{
+    type:'bar',data:{labels,datasets:[{label:'利差(bp)',data:data.spread,backgroundColor:spColors,borderRadius:2,borderSkipped:false}]},
+    options:{...baseOpts,plugins:{tooltip:{...tt('#2dd4bf'),callbacks:{label:c=>` 利差: ${c.parsed.y.toFixed(1)} bp`}}},
+    scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v+'bp'}}}}
+  });
+
+  // 3. ETF双价格（双轴，价格接近可共轴）
+  chartETF=new Chart(document.getElementById('chartETF'),{
+    type:'line',data:{labels,datasets:[
+      {label:'3033 恒生科技',data:data.etf3033,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'y'},
+      {label:'3110 恒生高股息',data:data.etf3110,borderColor:'#f472b6',borderWidth:1.8,tension:0.4,borderDash:[5,3],fill:false,yAxisID:'y2'}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#60a5fa')}},
+      scales:{
+        x:baseScales.x,
+        y:{...baseScales.y,position:'left',ticks:{callback:v=>'$'+v.toFixed(2)}},
+        y2:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>'$'+v.toFixed(2)}}
+      }
+    }
+  });
+
+  // 4. Ratio 3033/3110
+  const ratioColors=data.ratio.map((_,i)=>{
+    if(i===0)return'rgba(167,139,250,0.6)';
+    return data.ratio[i]>data.ratio[i-1]?'rgba(96,165,250,0.7)':'rgba(244,114,182,0.6)';
+  });
+  chartRatio=new Chart(document.getElementById('chartRatio'),{
+    type:'line',data:{labels,datasets:[
+      {label:'3033÷3110',data:data.ratio,borderColor:'#a78bfa',borderWidth:1.8,tension:0.4,
+       fill:{target:'origin',above:'rgba(96,165,250,0.05)',below:'rgba(244,114,182,0.05)'},
+       pointBackgroundColor:ratioColors,pointRadius:0,pointHoverRadius:4}
+    ]},
+    options:{...baseOpts,plugins:{tooltip:{...tt('#a78bfa'),callbacks:{label:c=>` 比值: ${c.parsed.y.toFixed(4)}`}}},
+    scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(3)}}}}
+  });
+
+  // 5. Overlay: spread + ratio + south (三轴)
+  chartOverlay=new Chart(document.getElementById('chartOverlay'),{
+    type:'line',data:{labels,datasets:[
+      {label:'利差(bp)',data:data.spread,borderColor:'#2dd4bf',borderWidth:1.5,tension:0.4,
+       fill:{target:'origin',above:'rgba(248,113,113,0.07)',below:'rgba(74,222,128,0.07)'},yAxisID:'y'},
+      {label:'3033÷3110 比值',data:data.ratio,borderColor:'#a78bfa',borderWidth:1.5,tension:0.4,borderDash:[5,3],fill:false,yAxisID:'y2'},
+      {label:'南向净流(亿)',data:data.south,borderColor:'#fbbf24',borderWidth:1,tension:0.4,borderDash:[2,4],fill:false,yAxisID:'y3'}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#2dd4bf')}},
+      scales:{
+        x:baseScales.x,
+        y:{...baseScales.y,position:'left',ticks:{callback:v=>v+'bp'},title:{display:true,text:'利差bp',color:'#2dd4bf',font:{size:9}}},
+        y2:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v.toFixed(3)},title:{display:true,text:'比值',color:'#a78bfa',font:{size:9}}},
+        y3:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'亿'},title:{display:true,text:'南向亿',color:'#fbbf24',font:{size:9}},offset:true}
+      }
+    }
+  });
+
+  // 6. SOFR-IORB + TIPS 双轴
+  const siData = data.sofrIorb || [];
+  const tipsData = data.tips || [];
+  chartLiqPressure = new Chart(document.getElementById('chartLiqPressure'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'SOFR-IORB (bp)',data:siData,borderColor:'#fb923c',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'yL',
+       spanGaps:true},
+      {label:'10Y TIPS (%)',data:tipsData,borderColor:'#a78bfa',borderWidth:1.8,tension:0.4,borderDash:[5,3],fill:false,yAxisID:'yR',
+       spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{
+        legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#fb923c')},
+        annotation:{annotations:{
+          line10:{type:'line',yScaleID:'yL',yMin:10,yMax:10,borderColor:'rgba(248,113,113,0.4)',borderWidth:1,borderDash:[4,4]},
+          line5:{type:'line',yScaleID:'yL',yMin:5,yMax:5,borderColor:'rgba(251,191,36,0.35)',borderWidth:1,borderDash:[4,4]},
+          tipsLine:{type:'line',yScaleID:'yR',yMin:2.0,yMax:2.0,borderColor:'rgba(167,139,250,0.4)',borderWidth:1,borderDash:[4,4]}
+        }}
+      },
+      scales:{
+        x:baseScales.x,
+        yL:{...baseScales.y,position:'left',
+          ticks:{callback:v=>v+'bp'},
+          title:{display:true,text:'SOFR-IORB bp',color:'#fb923c',font:{size:9}}},
+        yR:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},
+          ticks:{callback:v=>v+'%'},
+          title:{display:true,text:'TIPS %',color:'#a78bfa',font:{size:9}}}
+      }
+    }
+  });
+
+  // 7. WRESBAL + DW 双轴（带背景插件）
+  const wData = data.wresbal || [];
+  const dwData = data.dw || [];
+  const wPlugin = {
+    id:'wBg',
+    beforeDraw(chart){
+      const {ctx,chartArea:{top,bottom,left,right},scales:{yL:ys,x:xs}}=chart;
+      if(!ys)return;
+      const y3  = ys.getPixelForValue(3000);
+      const y29 = ys.getPixelForValue(2900);
+      const yBot = ys.getPixelForValue(ys.min);
+      // green zone >3.0T
+      ctx.save();
+      ctx.fillStyle='rgba(74,222,128,0.04)';
+      ctx.fillRect(left,top,right-left,y3-top);
+      // red zone <2.9T
+      ctx.fillStyle='rgba(248,113,113,0.06)';
+      ctx.fillRect(left,y29,right-left,yBot-y29);
+      ctx.restore();
+    }
+  };
+  chartReserves = new Chart(document.getElementById('chartReserves'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'WRESBAL (B)',data:wData,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,yAxisID:'yL',
+       spanGaps:true},
+      {label:'贴现窗口 (B)',data:dwData,borderColor:'#f87171',borderWidth:1.5,borderDash:[6,3],tension:0.3,fill:false,yAxisID:'yR',
+       spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{
+        legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#60a5fa')},
+        wBg:{}
+      },
+      scales:{
+        x:baseScales.x,
+        yL:{...baseScales.y,position:'left',
+          ticks:{callback:v=>(v!=null?v.toFixed(2)+'B':'')},
+          title:{display:true,text:'准备金 T',color:'#60a5fa',font:{size:9}}},
+        yR:{...baseScales.y,position:'right',grid:{drawOnChartArea:false},
+          ticks:{callback:v=>(v!=null?v.toFixed(1)+'B':'')},
+          title:{display:true,text:'DW B',color:'#f87171',font:{size:9}}}
+      }
+    },
+    plugins:[wPlugin]
+  });
+
+  // ④ 利率曲线图表
+  const u2d  = data.us2y      || [];
+  const u10d = data.us10y     || [];
+  const s2d  = data.sp2y10y   || [];
+  const s3d  = data.sp3m10y   || [];
+  const beid = data.bei10y    || [];
+  const cnfd = data.cnusFred  || [];
+
+  // 8. 2Y / 10Y 收益率
+  chartYields = new Chart(document.getElementById('chartYields'),{
+    type:'line', data:{labels, datasets:[
+      {label:'2Y 美债',data:u2d,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,spanGaps:true},
+      {label:'10Y 美债',data:u10d,borderColor:'#2dd4bf',borderWidth:1.8,tension:0.4,borderDash:[5,3],fill:false,spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},tooltip:{...tt('#60a5fa'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+
+  // 9. 2Y-10Y / 3M-10Y 利差
+  chartYieldSpreads = new Chart(document.getElementById('chartYieldSpreads'),{
+    type:'line', data:{labels, datasets:[
+      {label:'2Y−10Y (%)',data:s2d,borderColor:'#f87171',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:0},above:'rgba(248,113,113,0.08)',below:'rgba(74,222,128,0.08)'},spanGaps:true},
+      {label:'3M−10Y (%)',data:s3d,borderColor:'#fb923c',borderWidth:1.5,tension:0.4,borderDash:[5,3],
+       fill:false,spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#f87171'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+
+  // 10. BEI 10Y
+  chartBei = new Chart(document.getElementById('chartBei'),{
+    type:'line', data:{labels, datasets:[
+      {label:'BEI 10Y (%)',data:beid,borderColor:'#fbbf24',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:2},above:'rgba(248,113,113,0.07)',below:'rgba(74,222,128,0.07)'},spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{tooltip:{...tt('#fbbf24'),callbacks:{label:c=>` BEI: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'},
+        suggestedMin:1.5,suggestedMax:3.5}}}
+  });
+
+  // 11. 中美利差 FRED
+  chartCnUs = new Chart(document.getElementById('chartCnUs'),{
+    type:'line', data:{labels, datasets:[
+      {label:'US−CN 10Y (%)',data:cnfd,borderColor:'#4ade80',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:0},above:'rgba(74,222,128,0.08)',below:'rgba(248,113,113,0.08)'},spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{tooltip:{...tt('#4ade80'),callbacks:{label:c=>` US−CN: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
+  });
+}
+
+// ── KPI更新 ──
+function updateKPI(){
+  const i=data.dates.length-1;
+  const h=data.hibor[i],s=data.sofr[i],sp=data.spread[i],so=data.south[i];
+  const p3=data.etf3033[i],p1=data.etf3110[i],r=data.ratio[i];
+
+  document.getElementById('kpi-hibor').textContent=h.toFixed(3)+'%';
+  document.getElementById('kpi-sofr').textContent=s.toFixed(3)+'%';
+  document.getElementById('kpi-spread').textContent=(sp>=0?'+':'')+sp.toFixed(1)+'bp';
+  document.getElementById('kpi-south').textContent=(so>=0?'+':'')+so.toFixed(1);
+  document.getElementById('kpi-3033').textContent='$'+p3.toFixed(3);
+  document.getElementById('kpi-3110').textContent='$'+p1.toFixed(3);
+  document.getElementById('kpi-ratio').textContent=r.toFixed(4);
+
+  // HIBOR信号
+  const hChg=h-data.hibor[Math.max(0,i-5)];
+  const siH=document.getElementById('sig-hibor');
+  if(hChg<-0.05){siH.className='signal bullish';siH.textContent='↓ 港元宽松趋势';}
+  else if(hChg>0.05){siH.className='signal bearish';siH.textContent='↑ 港元偏紧趋势';}
+  else{siH.className='signal neutral';siH.textContent='→ 基本稳定';}
+
+  // 利差信号
+  const siSp=document.getElementById('sig-spread');
+  if(sp<-15){siSp.className='signal bullish';siSp.textContent='↓ 港元明显宽松';}
+  else if(sp<-5){siSp.className='signal bullish';siSp.textContent='↓ 港元小幅宽松';}
+  else if(sp>15){siSp.className='signal bearish';siSp.textContent='↑ 港元明显偏紧';}
+  else if(sp>5){siSp.className='signal warning';siSp.textContent='↑ 港元略偏紧';}
+  else{siSp.className='signal neutral';siSp.textContent='→ 利差中性';}
+
+  // 利差条
+  const pct=Math.min(100,Math.max(0,(sp+50)/100*100));
+  const bar=document.getElementById('spreadBar');
+  bar.style.width=pct+'%';
+  bar.style.background=sp<-5?'var(--green)':sp>5?'var(--red)':'var(--teal)';
+
+  // 南向信号
+  const siSo=document.getElementById('sig-south');
+  const avgS=data.south.slice(-10).reduce((a,b)=>a+b,0)/10;
+  if(so>avgS*1.5){siSo.className='signal bullish';siSo.textContent='↑ 显著高于均值';}
+  else if(so>0){siSo.className='signal bullish';siSo.textContent='↑ 净流入';}
+  else{siSo.className='signal bearish';siSo.textContent='↓ 净流出';}
+
+  // 3033信号（vs5日前）
+  const si3033=document.getElementById('sig-3033');
+  const chg3033=p3-data.etf3033[Math.max(0,i-5)];
+  const pct3033=(chg3033/data.etf3033[Math.max(0,i-5)]*100).toFixed(1);
+  if(chg3033>0){si3033.className='signal bullish';si3033.textContent=`↑ +${pct3033}% (5日)`;}
+  else{si3033.className='signal bearish';si3033.textContent=`↓ ${pct3033}% (5日)`;}
+
+  // 3110信号
+  const si3110=document.getElementById('sig-3110');
+  const chg3110=p1-data.etf3110[Math.max(0,i-5)];
+  const pct3110=(chg3110/data.etf3110[Math.max(0,i-5)]*100).toFixed(1);
+  if(chg3110>0){si3110.className='signal bullish';si3110.textContent=`↑ +${pct3110}% (5日)`;}
+  else{si3110.className='signal bearish';si3110.textContent=`↓ ${pct3110}% (5日)`;}
+
+  // 比值信号 + 分位
+  const siR=document.getElementById('sig-ratio');
+  const rMin=Math.min(...data.ratio),rMax=Math.max(...data.ratio);
+  const rPct=Math.round((r-rMin)/(rMax-rMin)*100);
+  document.getElementById('ratioBar').style.width=rPct+'%';
+  document.getElementById('ratioBarLabel').textContent=rPct+'%分位';
+  const rChg=r-data.ratio[Math.max(0,i-5)];
+  if(rChg>0.005){siR.className='signal bullish';siR.textContent='↑ 科技跑赢红利';}
+  else if(rChg<-0.005){siR.className='signal bearish';siR.textContent='↓ 红利跑赢科技';}
+  else{siR.className='signal neutral';siR.textContent='→ 比值横盘';}
+
+  // SOFR 曲线 / 远期价差
+  const s6m   = data.sofr6m         ? data.sofr6m[i]         : null;
+  const f13   = data.fwd1x3         ? data.fwd1x3[i]         : null;
+  const f36   = data.fwd3x6         ? data.fwd3x6[i]         : null;
+  const crvSh = data.sofrCurveShape ? data.sofrCurveShape[i] : null;
+  if(s6m!=null) document.getElementById('kpi-sofr6m').textContent=s6m.toFixed(4)+'%';
+  if(f13!=null) document.getElementById('kpi-fwd13').textContent=(f13>=0?'+':'')+f13.toFixed(1)+'bp';
+  if(f36!=null) document.getElementById('kpi-fwd36').textContent=(f36>=0?'+':'')+f36.toFixed(1)+'bp';
+  const siCrv=document.getElementById('sig-sofrcrv');
+  const card=document.getElementById('kpi-sofrcrv-card');
+  if(crvSh!=null){
+    if(crvSh>10){
+      siCrv.className='signal bearish'; siCrv.textContent='🔴 Back结构确认';
+      card.className='kpi orange';
+    } else if(crvSh>0){
+      siCrv.className='signal warning'; siCrv.textContent='⚠️ 近端压力';
+      card.className='kpi orange';
+    } else {
+      siCrv.className='signal bullish'; siCrv.textContent='✓ Contango · 正常形态';
+      card.className='kpi green';
+    }
+  } else if(f36!=null){
+    if(f36>10){
+      siCrv.className='signal bearish'; siCrv.textContent='↑ 市场预期收紧';
+      card.className='kpi red';
+    } else if(f36<-10){
+      siCrv.className='signal bullish'; siCrv.textContent='↓ 市场预期宽松';
+      card.className='kpi green';
+    } else {
+      siCrv.className='signal neutral'; siCrv.textContent='→ 曲线平坦';
+      card.className='kpi teal';
+    }
+  }
+
+  document.getElementById('updateTime').textContent='最后更新: '+new Date().toLocaleString('zh-HK');
+
+  // ── ③ 美元流动性底层指标 ──────────────────────────────────────────
+  const si  = data.sofrIorb ? data.sofrIorb[i]  : null;
+  const wre = data.wresbal   ? data.wresbal[i]   : null;
+  const dw  = data.dw        ? data.dw[i]        : null;
+  const tip = data.tips      ? data.tips[i]      : null;
+
+  // SOFR-IORB
+  if(si!=null){
+    document.getElementById('kpi-sofr-iorb').textContent=(si>=0?'+':'')+si.toFixed(1)+'bp';
+    const siCard=document.getElementById('kpi-sofr-iorb-card');
+    const siSig=document.getElementById('sig-sofr-iorb');
+    let hi3=true;
+    for(let k=1;k<=3;k++){const v=data.sofrIorb[i-k];if(v==null||v<=10){hi3=false;break;}}
+    if(si<5){
+      siCard.className='kpi green'; siSig.className='signal bullish'; siSig.textContent='隔夜充裕';
+    } else if(si<10){
+      siCard.className='kpi amber'; siSig.className='signal warning'; siSig.textContent='轻度分化';
+    } else if(si<20){
+      siCard.className='kpi orange'; siSig.className='signal warning';
+      siSig.textContent=hi3?'压力累积 持续3日':'准备金压力';
+      if(hi3) siCard.classList.add('blink');
+    } else {
+      siCard.className='kpi red blink'; siSig.className='signal bearish';
+      siSig.textContent='🔴 严重分化';
+    }
+  }
+
+  // SOFR-EFFR
+  const seVal = data.sofrEffrBp ? data.sofrEffrBp[i] : null;
+  if(seVal!=null){
+    document.getElementById('kpi-sofr-effr').textContent=(seVal>=0?'+':'')+seVal.toFixed(1)+'bp';
+    const seCard=document.getElementById('kpi-sofr-effr-card');
+    const seSig =document.getElementById('sig-sofr-effr');
+    if(seVal<5){
+      seCard.className='kpi green'; seSig.className='signal bullish'; seSig.textContent='货币市场平稳';
+    } else if(seVal<10){
+      seCard.className='kpi amber'; seSig.className='signal warning'; seSig.textContent='轻度压力';
+    } else if(seVal<20){
+      seCard.className='kpi orange'; seSig.className='signal warning'; seSig.textContent='货币市场压力';
+    } else {
+      seCard.className='kpi red blink'; seSig.className='signal bearish'; seSig.textContent='🔴 严重压力';
+    }
+  }
+
+  // 三重共振
+  const cShape = data.sofrCurveShape ? data.sofrCurveShape[i] : null;
+  const sEffr  = data.sofrEffrBp     ? data.sofrEffrBp[i]     : null;
+  const sIorb2 = data.sofrIorb       ? data.sofrIorb[i]       : null;
+  let nTrig=0,trigNames=[];
+  if(cShape!=null&&cShape>0){nTrig++;trigNames.push('①曲线Back('+cShape.toFixed(1)+'bp)');}
+  if(sIorb2!=null&&sIorb2>5){nTrig++;trigNames.push('②SOFR-IORB(+'+(sIorb2.toFixed(1))+'bp)');}
+  if(sEffr!=null&&sEffr>5){nTrig++;trigNames.push('③SOFR-EFFR(+'+(sEffr.toFixed(1))+'bp)');}
+  const rcCard=document.getElementById('resonance-card');
+  const rcText=document.getElementById('resonance-text');
+  const rcDetail=document.getElementById('resonance-detail');
+  if(nTrig===0){rcCard.className='resonance-card green';rcText.textContent='🟢 流动性正常';}
+  else if(nTrig===1){rcCard.className='resonance-card amber';rcText.textContent='🟡 流动性关注';}
+  else if(nTrig===2){rcCard.className='resonance-card orange';rcText.textContent='🟠 流动性预警 · 建议降低风险敞口';}
+  else{rcCard.className='resonance-card red blink';rcText.textContent='🔴 流动性危机 · 三重共振确认 · 全面避险';}
+  if(trigNames.length) rcDetail.textContent='触发：'+trigNames.join(' · ');
+
+  // WRESBAL
+  if(wre!=null){
+    document.getElementById('kpi-wresbal').textContent=Math.round(wre).toLocaleString()+'B';
+    const dist=wre-3000;
+    document.getElementById('kpi-wresbal-dist').textContent='距3,000B: '+(dist>=0?'+':'')+Math.round(dist)+'B';
+    const wCard=document.getElementById('kpi-wresbal-card');
+    const wSig=document.getElementById('sig-wresbal');
+    if(wre>3000){
+      wCard.className='kpi green'; wSig.className='signal bullish'; wSig.textContent='理想 >3000B';
+   } else if(wre>2900){
+      wCard.className='kpi amber'; wSig.className='signal warning'; wSig.textContent='警戒 2900~3000B';
+    } else {
+      wCard.className='kpi red'; wSig.className='signal bearish'; wSig.textContent='危险 <2900B';
+    }
+  }
+
+  // DW
+  if(dw!=null){
+    document.getElementById('kpi-dw').textContent=dw.toFixed(2)+'B';
+    // week-over-week change (find prev non-null)
+    let prevDw=null;
+    for(let k=i-1;k>=0;k--){if(data.dw[k]!=null){prevDw=data.dw[k];break;}}
+    if(prevDw!=null){
+      const chgDw=dw-prevDw;
+      document.getElementById('kpi-dw-chg').textContent='较上周: '+(chgDw>=0?'+':'')+chgDw.toFixed(2)+'B';
+    }
+    const dwCard=document.getElementById('kpi-dw-card');
+    const dwSig=document.getElementById('sig-dw');
+    if(dw<2){
+      dwCard.className='kpi green'; dwSig.className='signal bullish'; dwSig.textContent='正常 <2B';
+    } else if(dw<5){
+      dwCard.className='kpi amber'; dwSig.className='signal warning'; dwSig.textContent='警戒 2~5B';
+    } else {
+      dwCard.className='kpi red'; dwSig.className='signal bearish'; dwSig.textContent='危险 >5B';
+    }
+  }
+
+  // TIPS
+  if(tip!=null){
+    document.getElementById('kpi-tips').textContent=tip.toFixed(3)+'%';
+    const tipCard=document.getElementById('kpi-tips-card');
+    const tipSig=document.getElementById('sig-tips');
+    const prevTip=data.tips[Math.max(0,i-5)];
+    const tipChg=prevTip!=null?tip-prevTip:0;
+    if(tipChg<-0.1){
+      tipCard.className='kpi green'; tipSig.className='signal bullish'; tipSig.textContent='↓ 实际利率下行';
+    } else if(tipChg>0.1){
+      tipCard.className='kpi red'; tipSig.className='signal bearish'; tipSig.textContent='↑ 压制估值';
+    } else {
+      tipCard.className='kpi purple'; tipSig.className='signal neutral'; tipSig.textContent='→ 横盘';
+    }
+  }
+
+  // 联动徽章
+  const badge=document.getElementById('liq-badge');
+  const badgeText=document.getElementById('liq-badge-text');
+  if(wre!=null&&dw!=null){
+    if(wre>3.0&&dw<2){
+      badge.className='liq-badge green'; badgeText.textContent='流动性理想 · WRESBAL>3T & DW<2B';
+    } else if(wre<2.9||dw>5){
+      badge.className='liq-badge red blink'; badgeText.textContent='流动性危险 · WRESBAL<2.9T 或 DW>5B';
+    } else {
+      badge.className='liq-badge amber'; badgeText.textContent='流动性警戒 · 接近阈值';
+    }
+  }
+
+  // ── ④ 利率曲线 KPI ──────────────────────────────────────────────
+  function spreadClass(v){
+    if(v===null||v===undefined)return'red';
+    if(v<0)return'red';
+    if(v<0.25)return'orange';
+    if(v<0.5)return'amber';
+    return'green';
+  }
+  function spreadSig(v){
+    if(v===null||v===undefined)return['neutral','— 无数据'];
+    if(v<0)return['bearish','曲线倒挂 · 衰退信号'];
+    if(v<0.25)return['warning','接近倒挂 · 警戒'];
+    if(v<0.5)return['warning','曲线平坦 · 注意'];
+    return['bullish','正斜率 · 健康'];
+  }
+
+  const sp2=data.sp2y10y?data.sp2y10y[i]:null;
+  const sp3=data.sp3m10y?data.sp3m10y[i]:null;
+  const u2 =data.us2y   ?data.us2y[i]   :null;
+  const u10=data.us10y  ?data.us10y[i]  :null;
+  const bei=data.bei10y ?data.bei10y[i] :null;
+  const cnf=data.cnusFred?data.cnusFred[i]:null;
+
+  // 2Y-10Y
+  if(sp2!=null){
+    document.getElementById('kpi-sp2y10y').textContent=(sp2>=0?'+':'')+sp2.toFixed(3)+'%';
+    const [sc,st]=spreadSig(sp2);
+    const card=document.getElementById('kpi-sp2y10y-card'),sig=document.getElementById('sig-sp2y10y');
+    card.className='kpi '+spreadClass(sp2);
+    sig.className='signal '+sc; sig.textContent=st;
+  }
+  // 3M-10Y
+  if(sp3!=null){
+    document.getElementById('kpi-sp3m10y').textContent=(sp3>=0?'+':'')+sp3.toFixed(3)+'%';
+    const [sc,st]=spreadSig(sp3);
+    const card=document.getElementById('kpi-sp3m10y-card'),sig=document.getElementById('sig-sp3m10y');
+    card.className='kpi '+spreadClass(sp3);
+    sig.className='signal '+sc; sig.textContent=st;
+  }
+  // 2Y
+  if(u2!=null){
+    document.getElementById('kpi-us2y').textContent=u2.toFixed(3)+'%';
+    const prev=data.us2y[Math.max(0,i-5)];
+    const chg=prev!=null?u2-prev:0;
+    const sig=document.getElementById('sig-us2y');
+    if(chg>0.1){sig.className='signal bearish';sig.textContent='↑ 短端上行 · 压制估值';}
+    else if(chg<-0.1){sig.className='signal bullish';sig.textContent='↓ 短端下行 · 宽松预期';}
+    else{sig.className='signal neutral';sig.textContent='→ 短端稳定';}
+  }
+  // 10Y
+  if(u10!=null){
+    document.getElementById('kpi-us10y').textContent=u10.toFixed(3)+'%';
+    const prev=data.us10y[Math.max(0,i-5)];
+    const chg=prev!=null?u10-prev:0;
+    const sig=document.getElementById('sig-us10y');
+    if(chg>0.1){sig.className='signal bearish';sig.textContent='↑ 长端上行 · 压制黄金/科技';}
+    else if(chg<-0.1){sig.className='signal bullish';sig.textContent='↓ 长端下行 · 利好风险资产';}
+    else{sig.className='signal neutral';sig.textContent='→ 长端稳定';}
+  }
+  // BEI 10Y
+  if(bei!=null){
+    document.getElementById('kpi-bei10y').textContent=bei.toFixed(3)+'%';
+    const card=document.getElementById('kpi-bei10y-card'),sig=document.getElementById('sig-bei10y');
+    if(bei>2.5){card.className='kpi red';sig.className='signal bearish';sig.textContent='通胀预期过热 >2.5%';}
+    else if(bei>2){card.className='kpi amber';sig.className='signal warning';sig.textContent='通胀预期偏高 2~2.5%';}
+    else{card.className='kpi green';sig.className='signal bullish';sig.textContent='通胀预期温和 <2%';}
+  }
+  // 中美利差 FRED
+  if(cnf!=null){
+    document.getElementById('kpi-cnus-fred').textContent=(cnf>=0?'+':'')+cnf.toFixed(3)+'%';
+    const card=document.getElementById('kpi-cnus-fred-card'),sig=document.getElementById('sig-cnus-fred');
+    if(cnf<0){card.className='kpi red';sig.className='signal bearish';sig.textContent='US<CN · 异常倒挂';}
+    else if(cnf<0.5){card.className='kpi orange';sig.className='signal warning';sig.textContent='US-CN 利差偏窄 <0.5%';}
+    else if(cnf<1){card.className='kpi amber';sig.className='signal warning';sig.textContent='US-CN 利差收窄 0.5~1%';}
+    else{card.className='kpi green';sig.className='signal bullish';sig.textContent='US 利率溢价充足 >1%';}
+  }
+}
+
+// ── 数据表 ──
+function updateTable(){
+  const tbody=document.getElementById('dataTable');
+  const rows=[];
+  const n=Math.min(10,data.dates.length);
+  for(let i=data.dates.length-1;i>=data.dates.length-n;i--){
+    const sp=data.spread[i],so=data.south[i],r=data.ratio[i];
+    const rPrev=i>0?data.ratio[i-1]:r;
+    let sig,cls;
+    if(sp<-10&&so>20&&r>rPrev){sig='🟢 宽松+南下+科技强';cls='pos';}
+    else if(sp>10&&so<0&&r<rPrev){sig='🔴 偏紧+流出+红利强';cls='neg';}
+    else if(sp<0&&r>rPrev){sig='🔵 宽松+科技占优';cls='pos';}
+    else if(sp>0&&r<rPrev){sig='🟡 偏紧+红利防御';cls='neu';}
+    else{sig='⚪ 中性';cls='';}
+    rows.push(`<tr>
+      <td>${data.dates[i]}</td>
+      <td>${data.hibor[i].toFixed(3)}%</td>
+      <td>${data.sofr[i].toFixed(3)}%</td>
+      <td class="${sp<0?'pos':sp>0?'neg':''}">${sp>=0?'+':''}${sp.toFixed(1)}</td>
+      <td>$${data.etf3033[i].toFixed(3)}</td>
+      <td>$${data.etf3110[i].toFixed(3)}</td>
+      <td class="${r>rPrev?'pos':'neg'}">${r.toFixed(4)}</td>
+      <td class="${so>0?'pos':'neg'}">${so>=0?'+':''}${so.toFixed(1)}</td>
+      <td class="${cls}">${sig}</td>
+    </tr>`);
+  }
+  tbody.innerHTML=rows.join('');
+}
+
+// ── 解读 ──
+function updateInterp(){
+  const i=data.dates.length-1;
+  const sp=data.spread[i],so=data.south[i],r=data.ratio[i];
+  const rPrev=data.ratio[Math.max(0,i-5)];
+  // 新指标
+  const siV  = data.sofrIorb ? data.sofrIorb[i]  : null;
+  const wreV = data.wresbal   ? data.wresbal[i]   : null;
+  const tipV = data.tips      ? data.tips[i]      : null;
+  const tipPrev = data.tips   ? data.tips[Math.max(0,i-5)] : null;
+  const tipChg = (tipV!=null&&tipPrev!=null) ? tipV-tipPrev : null;
+  const rChg=((r-rPrev)/rPrev*100).toFixed(1);
+  const spAvg=data.spread.slice(-20).reduce((a,b)=>a+b,0)/20;
+
+  let t='<strong>综合解读：</strong>';
+
+  // ── 美元流动性底层信号 ──
+  let liqScore=0;
+  if(siV!=null&&siV<5) liqScore++; else if(siV!=null&&siV>10) liqScore--;
+  if(wreV!=null&&wreV>3.0) liqScore++; else if(wreV!=null&&wreV<2.9) liqScore-=2;
+  if(tipChg!=null&&tipChg<-0.1) liqScore++; else if(tipChg!=null&&tipChg>0.1) liqScore--;
+  if(liqScore>=2&&sp<-10){
+    t+='<strong>【做多加权】</strong> SOFR-IORB充裕+WRESBAL>3T+TIPS下行，美元流动性底层向好，与港元宽松共振——3033 积极做多。 ';
+  } else if(liqScore<=-2||siV>10&&wreV<2.9&&tipChg>0.1){
+    t+='<strong>【做空加权】</strong> SOFR-IORB>10bp+WRESBAL<2.9T+TIPS上行，美元流动性底层恶化——减仓3033，转守3110。 ';
+  } else if(siV!=null){
+    t+=`SOFR-IORB ${siV>=0?'+':''}${siV!=null?siV.toFixed(1):'--'}bp（准备金底层）· WRESBAL ${wreV!=null?wreV.toFixed(3)+'T':'--'} · TIPS ${tipV!=null?tipV.toFixed(3)+'%':'--'}，底层流动性尚稳。 `;
+  }
+
+
+  // 流动性
+  if(sp<-10)t+=`HIBOR-SOFR利差 <strong>${sp.toFixed(1)}bp</strong>，港元流动性明显宽松，利率环境有利于高估值科技股折现率下行。`;
+  else if(sp>10)t+=`HIBOR-SOFR利差 <strong>+${sp.toFixed(1)}bp</strong>，港元偏紧，科技股估值承压，红利股相对防御价值上升。`;
+  else t+=`HIBOR-SOFR利差 <strong>${sp>=0?'+':''}${sp.toFixed(1)}bp</strong>，港元流动性中性。`;
+
+  // 比值
+  if(r>rPrev)t+=` 3033÷3110比值近5日上升 <strong>+${rChg}%</strong>，科技相对红利占优，与利率宽松逻辑共振。`;
+  else t+=` 3033÷3110比值近5日下降 <strong>${rChg}%</strong>，红利相对防御，留意利率环境是否有转向迹象。`;
+
+  // 南向
+  if(so>30)t+=` 南向净流入 <strong>${so.toFixed(1)}亿</strong>，三者共振（宽松+科技强+资金流入），关注恒生科技短期动能。`;
+  else if(so<-10)t+=` 南向净流出 <strong>${Math.abs(so).toFixed(1)}亿</strong>，需结合人民币汇率判断换汇意愿是否减弱。`;
+
+  t+=' <strong>关键逻辑：</strong>HIBOR下行→融资成本降低→科技估值修复→3033/3110比值走阔，是付鹏框架下的完整链条。利差走阔时应警惕科技仓位。';
+  document.getElementById('interp').innerHTML=t;
+}
+
+
+// ── Init ──
+initCharts();updateKPI();updateTable();updateInterp();
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+name: Backfill History
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests akshare yfinance
+
+      - name: Run backfill.py
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python backfill.py
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html data/history.json
+          git diff --cached --quiet || git commit -m "chore: backfill history 2026-01-01 to today"
+          git push

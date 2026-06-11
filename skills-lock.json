@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "skills": {
+    "defuddle": {
+      "source": "kepano/obsidian-skills",
+      "sourceType": "github",
+      "computedHash": "eefad29dff723822d076f9cc37d8873aed741bd02d182601af44938e4ec0889e"
+    },
+    "json-canvas": {
+      "source": "kepano/obsidian-skills",
+      "sourceType": "github",
+      "computedHash": "bb7aa4f03414d50d91736f824bc5f79122b38a895deb03c0260700842a338580"
+    },
+    "obsidian-bases": {
+      "source": "kepano/obsidian-skills",
+      "sourceType": "github",
+      "computedHash": "f26b102cdd28a3ee9d429e04b19590464108c062bf4765cfd1b073cc445016be"
+    },
+    "obsidian-cli": {
+      "source": "kepano/obsidian-skills",
+      "sourceType": "github",
+      "computedHash": "89ded0eb1499286d5c95217df0ff7015aa46b7efe4646fafaba38cbac3289392"
+    },
+    "obsidian-markdown": {
+      "source": "kepano/obsidian-skills",
+      "sourceType": "github",
+      "computedHash": "9ca4f671ffecfd020c8d9c733aed75bde42742fb5545b48b6bf8e5e54111b9ac"
+    }
+  }
+}

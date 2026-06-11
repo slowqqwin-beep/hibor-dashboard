@@ -1,0 +1,252 @@
+{
+  "main": {
+    "id": "14f052698e06f80d",
+    "type": "split",
+    "children": [
+      {
+        "id": "c91a64b76f4ecdee",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a1fb838ce4871921",
+            "type": "leaf",
+            "pinned": true,
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "05_HotMoney_Logic/00_游资复盘总看板.md",
+                "mode": "preview",
+                "source": false
+              },
+              "pinned": true,
+              "icon": "lucide-file",
+              "title": "00_游资复盘总看板"
+            }
+          }
+        ]
+      },
+      {
+        "id": "0aefd06b836c0f1d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d0c3c3cc119d076e",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "05_HotMoney_Logic/00_游资复盘总看板.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "00_游资复盘总看板"
+            }
+          }
+        ]
+      },
+      {
+        "id": "78b350ddf7a6da51",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6625c0a8064fd196",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "关系图谱"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "4fa00dadd8356856",
+    "type": "split",
+    "children": [
+      {
+        "id": "58fa9425f647ca92",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7cf0545ce8278589",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "75b3c7ce85f5ad88",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "6206a3f797f1eef7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "587a34a8d5707b5c",
+    "type": "split",
+    "children": [
+      {
+        "id": "73cc1fc117b375d9",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "235a5ae54eeb51c2",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "欢迎.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "欢迎 的反向链接列表"
+            }
+          },
+          {
+            "id": "b1606cad09f7133a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "欢迎.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "欢迎 的出链列表"
+            }
+          },
+          {
+            "id": "0e84c112861cb465",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "f5c00f0d17535821",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "b5b1fd6d164dd0ee",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "欢迎.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "欢迎 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "d0c3c3cc119d076e",
+  "lastOpenFiles": [
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0030.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0029.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0028.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0027.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0026.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0025.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0024.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0023.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0022.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0021.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001/frame_0020.jpg",
+    "05_HotMoney_Logic/frames/day2/20231105下午_part001",
+    "05_HotMoney_Logic/transcripts/day2/20231105下午_part000.md",
+    "05_HotMoney_Logic/transcribe_day2.log",
+    "06 FICC与宏观逻辑/final_links_with_url.csv",
+    "06 FICC与宏观逻辑/extract_hyperlinks.py",
+    "06 FICC与宏观逻辑/【付鹏的财经世界】文章目录索引.xlsx",
+    "05_HotMoney_Logic/frames/day2/20231105上午_part000",
+    "05_HotMoney_Logic/transcribe_day2.py",
+    "05_HotMoney_Logic/frames/day2",
+    "05_HotMoney_Logic/transcripts/day2",
+    "05_HotMoney_Logic/20231104上午_part000.md",
+    "05_HotMoney_Logic/00_游资复盘总看板.md",
+    "05_HotMoney_Logic/frames/20231104下午_part002",
+    "欢迎.md"
+  ]
+}

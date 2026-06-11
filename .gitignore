@@ -1,0 +1,17 @@
+.env
+frames/
+.venv/
+.venv_old/
+venv/
+__pycache__/
+*.log
+audio_source/
+*.mp3
+*.mp4
+*.exe
+*.zip
+*.7z
+*.rar
+*.db
+*.sqlite
+*.sqlite3

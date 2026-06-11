@@ -1,0 +1,5 @@
+conda activate chan310
+
+windows_run.bat
+
+python -m chanlun.utils

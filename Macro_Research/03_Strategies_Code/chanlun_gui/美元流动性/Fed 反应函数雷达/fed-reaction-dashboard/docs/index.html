@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fed Reaction Dashboard</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero-glow"></div>
+      <nav class="topbar">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <span>Fed Reaction Dashboard</span>
+        </div>
+        <div class="timestamp">2026-06-11 15:31:09 · GitHub Actions</div>
+      </nav>
+
+      <section class="hero-grid">
+        <div class="hero-main card glass">
+          <div class="eyebrow">Market Regime</div>
+          <div class="status-row">
+            <span class="status-pill red">RED</span>
+            <h1>不适合抄底：风险过高</h1>
+          </div>
+          <p class="hero-copy">当前读数收敛为：<strong>不适合抄底：风险过高</strong>。这不是单纯"跌了就买"的环境，先看利率、实际利率、信用与波动是否继续恶化。</p>
+          <div class="hero-tags">
+            <span>Fed 鹰派 3/4</span>
+            <span>VIX 22.22</span>
+            <span>HYG/LQD 0.7347</span>
+            <span>10Y 4.542%</span>
+          </div>
+        </div>
+
+        <aside class="decision card">
+          <div class="card-title">今日操作框架</div>
+                    <div class="decision-line danger">
+            <span>主导矛盾</span>
+            <strong>鹰派重定价</strong>
+          </div>
+          <div class="decision-line ok">
+            <span>系统性压力</span>
+            <strong>暂未触发</strong>
+          </div>
+          <div class="decision-line warn">
+            <span>VIX</span>
+            <strong>可控 (22.22)</strong>
+          </div>
+          <p class="small-note">如果要重新考虑抄底，优先等：10Y 停止上行、VIX 不再扩张、HYG/LQD 稳住、QQQ 跌幅收敛。</p>
+        </aside>
+      </section>
+    </header>
+
+    <main>
+      <section class="score-section">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Signal Modules</div>
+            <h2>模块评分</h2>
+          </div>
+          <p>红色代表压力源，绿色代表尚未确认系统性风险。</p>
+        </div>
+
+        <div class="score-grid">
+                    <article class="score-card hot">
+            <div class="score-top"><span>A. Fed鹰派</span><b>3/4</b></div>
+            <div class="meter"><span style="width:75%"></span></div>
+            <p>SHY↓ + DXY↑ + 黄金↓ + 纳指弱 (SHY=2Y代理)</p>
+          </article>
+          <article class="score-card mute">
+            <div class="score-top"><span>B. Fed鸽派</span><b>0/4</b></div>
+            <div class="meter"><span style="width:0%"></span></div>
+            <p>SHY↑ + 黄金↑ + DXY↓ + 纳指强</p>
+          </article>
+          <article class="score-card ok">
+            <div class="score-top"><span>C. 流动性压力</span><b>0/3</b></div>
+            <div class="meter"><span style="width:0%"></span></div>
+            <p>VIX>25 + HYG/LQD↓ + Russell弱 (VIX阈值在此=25)</p>
+          </article>
+          <article class="score-card calm">
+            <div class="score-top"><span>D. 通胀/期限溢价</span><b>1/4</b></div>
+            <div class="meter"><span style="width:25%"></span></div>
+            <p>熊陡+30Y↑+WTI↑; 熊平→Fed重定价上限2</p>
+          </article>
+          <article class="score-card ok">
+            <div class="score-top"><span>E. 增长恐慌</span><b>0/3</b></div>
+            <div class="meter"><span style="width:0%"></span></div>
+            <p>SHY&IEF↑(2Y&10Y↓) + 小盘弱 + 股指分化</p>
+          </article>
+          <article class="score-card calm">
+            <div class="score-top"><span>F. 实际利率/估值挤压</span><b>0/4</b></div>
+            <div class="meter"><span style="width:0%"></span></div>
+            <p></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="chain-section card">
+        <div class="section-head compact">
+          <div>
+            <div class="eyebrow">Asset Reaction Chain</div>
+            <h2>资产反应链条</h2>
+          </div>
+        </div>
+        <div class="chain-scroll">
+          <div class="asset-chain">
+                      <div class="chain-card danger">
+              <div class="chain-label">Fed预期</div>
+              <div class="chain-title">偏鹰</div>
+              <div class="chain-value">短中端重定价</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-card danger">
+              <div class="chain-label">名义利率</div>
+              <div class="chain-title">上行</div>
+              <div class="chain-value">10Y 4.542%</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-card neutral">
+              <div class="chain-label">实际利率</div>
+              <div class="chain-title">次要项</div>
+              <div class="chain-value">非主驱动</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-card danger">
+              <div class="chain-label">黄金 / 成长</div>
+              <div class="chain-title">承压</div>
+              <div class="chain-value">GLD -4.15% · QQQ -2.00%</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-card danger">
+              <div class="chain-label">信用</div>
+              <div class="chain-title">轻微恶化</div>
+              <div class="chain-value">HYG -0.19%</div>
+            </div>
+            <div class="chain-arrow">→</div>
+            <div class="chain-card warning">
+              <div class="chain-label">波动率</div>
+              <div class="chain-title">升温</div>
+              <div class="chain-value">VIX 22.22</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="data-grid">
+                <article class="card table-card">
+          <div class="card-title">美债收益率</div>
+          <table>
+            <thead><tr><th>期限</th><th>最新</th><th>日变</th><th>5日变</th></tr></thead>
+            <tbody>
+              <tr><td>13W</td><td>3.635%</td><td class="flat">-0.0bp</td><td class="up">+1.5bp</td></tr>
+              <tr><td>5Y</td><td>4.264%</td><td class="up">+1.1bp</td><td class="up strong">+7.6bp</td></tr>
+              <tr><td>10Y</td><td>4.542%</td><td class="up">+1.4bp</td><td class="up strong">+6.5bp</td></tr>
+              <tr><td>30Y</td><td>5.025%</td><td class="up">+1.4bp</td><td class="up">+4.7bp</td></tr>
+            </tbody>
+          </table>
+          <div class="insight danger-soft">曲线 tilt：<strong>曲线tilt(5D): Bear Flattening (前端领跌: 5Y+7.6bp > 10Y+6.5bp > 30Y+4.7bp) → Fed重定价驱动,非期限溢价</strong></div>        </article>
+                <article class="card table-card">
+          <div class="card-title">ETF 快照</div>
+          <table>
+            <thead><tr><th>标的</th><th>价格</th><th>日涨跌</th><th>信号</th></tr></thead>
+            <tbody>
+              <tr><td>SHY</td><td>$81.94</td><td class="flat">+0.00%</td><td>2Y代理</td></tr>
+              <tr><td>IEF</td><td>$93.69</td><td class="down">-0.10%</td><td>10Y代理</td></tr>
+              <tr><td>TLT</td><td>$84.88</td><td class="down">-0.28%</td><td>长端利率</td></tr>
+              <tr><td>UUP</td><td>$28.05</td><td class="up">+0.14%</td><td>美元</td></tr>
+              <tr><td>GLD</td><td>$374.58</td><td class="down strong">-4.15%</td><td>黄金</td></tr>
+              <tr><td>QQQ</td><td>$693.69</td><td class="down strong">-2.00%</td><td>Nasdaq</td></tr>
+              <tr><td>SPY</td><td>$725.43</td><td class="down strong">-1.58%</td><td>S&P500</td></tr>
+              <tr><td>IWM</td><td>$282.05</td><td class="down">-1.04%</td><td>Russell</td></tr>
+              <tr><td>HYG</td><td>$79.47</td><td class="down">-0.19%</td><td>信用HY</td></tr>
+              <tr><td>LQD</td><td>$108.16</td><td class="down">-0.23%</td><td>信用IG</td></tr>
+              <tr><td>VXX</td><td>$26.6</td><td class="up strong">+5.68%</td><td>波动率</td></tr>
+              <tr><td>CL</td><td>$89.95</td><td class="up strong">+2.45%</td><td>WTI原油</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <section class="explain-grid">
+        <article class="card explain-card">
+          <div class="card-title">自动解读</div>
+          <p><strong>1. 为什么是鹰派重定价？</strong> 从模块评分和曲线结构判断，利率上行集中在短中端，属于 Fed 路径重定价而非期限溢价拉升。</p>
+<p><strong>2. 为什么不是系统性危机？</strong> 流动性压力评分低的背景下，信用 ETF 未现明显恶化，VIX 虽上行但仍处于可控区间，系统性风险链未闭合。</p>
+<p><strong>3. 黄金为什么跌这么多？</strong> 当真实利率变化幅度不足以解释黄金跌幅时，缺口更可能来自仓位踩踏/动量去杠杆，而非实际利率主导。</p>
+        </article>
+
+        <article class="card watch-card">
+          <div class="card-title">重新考虑抄底的条件</div>
+          <ul class="watch-list">
+                        <li><span></span>10Y 收益率停止上行，最好重新压回 4.50% 附近或下方。</li>
+            <li><span></span>VIX 不再扩张，且信用 HYG/LQD 稳住。</li>
+            <li><span></span>QQQ 跌幅收敛，不再被实际利率/贴现率压制。</li>
+            <li><span></span>GLD 跌幅开始与实际利率变化重新匹配，而不是继续仓位踩踏。</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="cross card">
+        <div class="card-title">ABCD 交叉验证</div>
+        <div class="cross-grid">
+                    <div><b>A 鹰派 3/4 主导</b><span>C🔴 + 利率驱动 ✅</span></div>
+          <div><b>C 流动性压力 0/3</b><span>B🟢 + CASC MOVE平静 + HYG跑赢LQD ✅</span></div>
+          <div><b>E 增长恐慌 0/3</b><span>非增长恐慌 ✅</span></div>
+          <div><b>D 通胀 1/4 (熊平封顶)</b><span>BEI -13bp + 曲线熊平 ⚠️ 本工具D高估(已修正)</span></div>
+          <div><b>🔴 GLD -4.15%</b><span>真实利率平(TLT-0.28%, DFII10-1bp) ❌ 幅度断链: 真实利率是次要项, 主驱动=仓位/动量去杠杆(5/28高点-9.3%, 6/5&6/10两次加速)</span></div>
+          <div class="wide"><b>综合结论</b><span>两套独立模型收敛到同一读数: 鹰派·利率驱动·有序重定价·非系统性。交叉确认成立。<br>补注: GLD 缺口判别器不在"DFII10跳不跳"(它最多小幅上抬, 补不齐-4%), 而在"DFII10那点抬幅 vs -4%的缺口有多大"。补不齐的缺口本身=仓位信号。</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
