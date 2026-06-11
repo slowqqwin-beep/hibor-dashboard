@@ -8,6 +8,7 @@ on:
       - "fed-reaction-dashboard/fed_reaction_dashboard.md"
       - "fed-reaction-dashboard/data/**"
       - "fed-reaction-dashboard/scripts/build_site.py"
+      - "fed-reaction-dashboard/requirements.txt"
       - ".github/workflows/build-pages.yml"
   workflow_dispatch:
 
