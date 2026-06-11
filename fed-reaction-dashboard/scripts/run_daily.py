@@ -90,6 +90,9 @@ def main():
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     run_cmd(["git", "commit", "-m", f"auto: daily dashboard update {ts}"],
             cwd=str(repo_root), check=False)
+    # 先拉远程再推，--autostash 自动暂存未跟踪改动防止冲突
+    run_cmd(["git", "pull", "--rebase", "--autostash", "origin", "main"],
+            cwd=str(repo_root), check=False)
     run_cmd(["git", "push", "origin", "master:main"], cwd=str(repo_root))
 
     log("=" * 60)
