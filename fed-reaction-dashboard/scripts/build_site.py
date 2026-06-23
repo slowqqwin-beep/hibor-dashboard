@@ -336,11 +336,11 @@ def build_chain_nodes(treasury_rows, etf_rows, scores) -> str:
 
     # 名义利率 — 看 10Y
     row_10y = _find_treasury_row(treasury_rows, "10Y") or {}
-    d1_10y = row_10y.get("日变(bp)", "0")
+    d1_10y = _row_get(row_10y, "日变(bp)", "Daily (bp)", "Daily")
     d1_10y_val = _parse_bp(d1_10y)
     nom_v = "上行" if d1_10y_val > 0 else "下行" if d1_10y_val < 0 else "持平"
     nom_cls = "danger" if d1_10y_val > 0 else "neutral" if d1_10y_val < 0 else "warning"
-    nodes.append((nom_cls, "名义利率", nom_v, f"10Y {row_10y.get('最新', '--')}"))
+    nodes.append((nom_cls, "名义利率", nom_v, f"10Y {_row_get(row_10y, '最新', 'Latest', 'latest')}"))
 
     # 实际利率
     real_score = int(scores.get("F", {}).get("score", 0))
@@ -351,8 +351,8 @@ def build_chain_nodes(treasury_rows, etf_rows, scores) -> str:
     # 黄金/成长
     gld_row = _find_etf_row(etf_rows, "GLD") or {}
     qqq_row = _find_etf_row(etf_rows, "QQQ") or {}
-    gld_chg = gld_row.get("日涨跌", "0%")
-    qqq_chg = qqq_row.get("日涨跌", "0%")
+    gld_chg = _row_get(gld_row, "日涨跌", "Daily")
+    qqq_chg = _row_get(qqq_row, "日涨跌", "Daily")
     gld_down = _pct_negative(gld_chg)
     qqq_down = _pct_negative(qqq_chg)
     gold_v = "承压" if (gld_down or qqq_down) else "偏强"
@@ -362,7 +362,7 @@ def build_chain_nodes(treasury_rows, etf_rows, scores) -> str:
     # 信用
     hyg_row = _find_etf_row(etf_rows, "HYG") or {}
     lqd_row = _find_etf_row(etf_rows, "LQD") or {}
-    hyg_chg = hyg_row.get("日涨跌", "0%")
+    hyg_chg = _row_get(hyg_row, "日涨跌", "Daily")
     hyg_down = _pct_negative(hyg_chg)
     credit_v = "轻微恶化" if hyg_down else "稳定"
     credit_cls = "danger" if hyg_down else "neutral"
@@ -398,13 +398,13 @@ def _find_vix_from_md():
 
 
 def build_treasury_table(rows: list[dict], md_text: str = "") -> str:
-    """生成美债收益率表格 + 曲线 tilt 解读。"""
+    """生成美债收益率表格 + 曲线 tilt 解读（兼容 v1 中文 & v2 英文表头）。"""
     table_rows = ""
     for r in rows:
-        term = r.get("期限", "")
-        latest = r.get("最新", "--")
-        d1 = r.get("日变(bp)", "--")
-        d5 = r.get("5日变(bp)", "--")
+        term = _row_get(r, "期限", "Tenor", "tenor")
+        latest = _row_get(r, "最新", "Latest", "latest")
+        d1 = _row_get(r, "日变(bp)", "Daily (bp)", "Daily")
+        d5 = _row_get(r, "5日变(bp)", "5D (bp)", "5D")
 
         d1_cls = _bp_class(d1)
         d5_cls = _bp_class(d5, strong_threshold=5)
@@ -434,13 +434,13 @@ def build_treasury_table(rows: list[dict], md_text: str = "") -> str:
 
 
 def build_etf_table(rows: list[dict]) -> str:
-    """生成 ETF 快照表。"""
+    """生成 ETF 快照表（兼容 v1 中文 & v2 英文表头）。"""
     table_rows = ""
     for r in rows:
-        name = r.get("标的", "")
-        price = r.get("价格", "--")
-        chg = r.get("日涨跌", "--")
-        signal = r.get("信号", "")
+        name = _row_get(r, "标的", "Ticker", "ticker")
+        price = _row_get(r, "价格", "Price", "price")
+        chg = _row_get(r, "日涨跌", "Daily")
+        signal = _row_get(r, "信号", "Signal", "signal")
 
         chg_cls = _pct_class(chg)
         strong = " strong" if abs(_parse_pct(chg)) > 1.5 else ""
@@ -543,16 +543,25 @@ def build_cross_validation(md_text: str) -> str:
 # 3.  主流程
 # ──────────────────────────────────────────────
 
+def _row_get(row, *keys):
+    """Try multiple column names, return first non-empty value. Supports v1(CN) & v2(EN) tables."""
+    for k in keys:
+        v = row.get(k, "")
+        if v:
+            return v
+    return ""
+
+
 def _find_treasury_row(rows, term):
     for r in rows:
-        if term in str(r.get("期限", "")):
+        if term in str(_row_get(r, "期限", "Tenor", "tenor")):
             return r
     return None
 
 
 def _find_etf_row(rows, ticker):
     for r in rows:
-        if ticker.upper() in str(r.get("标的", "")).upper():
+        if ticker.upper() in str(_row_get(r, "标的", "Ticker", "ticker")).upper():
             return r
     return None
 
@@ -631,13 +640,13 @@ def main():
 
     for k, v in sections.items():
         kl = k.lower()
-        if "美债" in kl or "treasury" in kl or "收益率" in kl:
+        if any(x in kl for x in ("美债", "treasury", "ust", "yield", "收益率")):
             treasury_sec = v
         elif "etf" in kl and ("快照" in kl or "snapshot" in kl):
             etf_sec = v
         elif "vix" in kl:
             vix_sec = v
-        elif "评分" in kl or "模块" in kl or "signal" in kl:
+        elif any(x in kl for x in ("评分", "模块", "score module", "signal")):
             scores_sec = v
         elif "抄底" in kl or "建议" in kl:
             recommend_sec = v
@@ -653,22 +662,22 @@ def main():
     etf_rows = parse_table(etf_sec) if etf_sec else []
     score_rows = parse_table(scores_sec) if scores_sec else []
 
-    # 3. 构建 scores 字典
+    # 3. 构建 scores 字典（兼容 v1 中文 & v2 英文表头）
     scores = {}
     for r in score_rows:
-        key_raw = r.get("模块", r.get("", ""))
+        key_raw = _row_get(r, "模块", "Module", "module")
         # 提取 A/B/C/D/E/F
         m = re.match(r'([A-F])', key_raw)
         if m:
             key = m.group(1)
             scores[key] = {
-                "score": int(r.get("分数", r.get("score", 0)) or 0),
-                "max": int(r.get("满分", r.get("max", 4)) or 4),
-                "description": r.get("信号含义", r.get("信号", r.get("description", ""))),
+                "score": int(_row_get(r, "分数", "Score", "score") or 0),
+                "max": int(_row_get(r, "满分", "Max", "max") or 4),
+                "description": _row_get(r, "信号含义", "信号", "description", "Detail"),
             }
 
-    # 4. 从 latest.json 提取关键值
-    status = latest.get("status", "YELLOW")
+    # 4. 从 latest.json 提取关键值（兼容 v1/v2 键名）
+    status = latest.get("status", latest.get("state", "YELLOW"))
     headline = latest.get("headline", latest.get("recommendation", "--"))
     vix = latest.get("vix", None)
     hyg_lqd = latest.get("hyg_lqd", None)
