@@ -1,9 +1,34 @@
 {
-  "updated_at": "2026-06-11 10:44:58",
-  "status": "RED",
-  "headline": "不适合抄底：风险过高",
-  "recommendation": "不适合抄底：风险过高",
-  "vix": 22.22,
-  "hyg_lqd": 0.7347,
-  "ten_year": 4.542
+  "updated_at": "2026-06-23 13:05:58 CST",
+  "updated_at_utc": "2026-06-23 05:05:58 UTC",
+  "state": "OBSERVE",
+  "state_days": 7,
+  "headline": "No trigger B=0 C=0 E=1",
+  "recommendation": "OBSERVE",
+  "attribution": "混合信号",
+  "vix": 16.91,
+  "vix3m": 20.51,
+  "vix_vix3m_ratio": 0.824,
+  "hyg_lqd_z": {
+    "hyg_z": 1.546,
+    "lqd_z": 0.871,
+    "spread_z": 0.675
+  },
+  "hyg_lqd": 0.7349,
+  "ten_year": 4.487,
+  "scores": {
+    "hawkish": 2,
+    "dovish": 0,
+    "liquidity": 0,
+    "inflation": 1,
+    "growth": 1
+  },
+  "gates": {
+    "vix_contango": true,
+    "casc": true,
+    "credit": true
+  },
+  "upgrade_needs": [
+    "B>=3 (now 0/4)"
+  ]
 }

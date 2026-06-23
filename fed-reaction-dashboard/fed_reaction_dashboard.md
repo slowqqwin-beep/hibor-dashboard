@@ -1,76 +1,87 @@
-# Fed Reaction Dashboard
+# Fed Reaction Dashboard v2
 
-**2026-06-11 10:44:58** | Futu + yfinance
+**2026-06-23 13:05:58 CST** | **2026-06-23 05:05:58 UTC** | Futu + yfinance
 
-## 1. 美债收益率
+## 0. State Machine: **⏸ OBSERVE** (Day 7)
 
-| 期限 | 最新 | 日变(bp) | 5日变(bp) |
-|------|------|---------|----------|
-| 13W | 3.635% | -0.0 | +1.5 |
-| 5Y | 4.264% | +1.1 | +7.6 |
-| 10Y | 4.542% | +1.4 | +6.5 |
-| 30Y | 5.025% | +1.4 | +4.7 |
+> No trigger B=0 C=0 E=1
 
-**曲线tilt(5D): Bear Flattening** (前端领跌: 5Y+7.6bp > 10Y+6.5bp > 30Y+4.7bp) → Fed重定价驱动,非期限溢价
+> **To upgrade**: B>=3 (now 0/4)
 
-## 2. ETF 快照 (Futu)
+## Driver Attribution
 
-| 标的 | 价格 | 日涨跌 | 5日涨跌 | 信号 |
-|------|------|--------|---------|------|
-| SHY | $81.94 | +0.00% | -0.11% | 2Y代理 |
-| IEF | $93.69 | -0.10% | -0.46% | 10Y代理 |
-| TLT | $84.88 | -0.28% | -0.73% | 长端利率 |
-| UUP | $28.05 | +0.14% | +0.75% | 美元 |
-| GLD | $374.58 | -4.15% | -8.92% | 黄金 |
-| QQQ | $693.69 | -2.00% | -6.34% | Nasdaq |
-| SPY | $725.43 | -1.58% | -4.18% | S&P500 |
-| IWM | $282.05 | -1.04% | -3.41% | Russell |
-| HYG | $79.47 | -0.19% | -0.45% | 信用HY |
-| LQD | $108.16 | -0.23% | -0.63% | 信用IG |
-| VXX | $26.6 | +5.68% | +13.19% | 波动率 |
-| CL | $89.95 | +2.45% | +5.70% | WTI原油 |
+**混合信号**
 
-**HYG/LQD**: 0.7347
+> 13W-0.5bp(0.4σ) / 5Y+2.3bp(0.5σ) / 10Y+2.4bp(0.6σ) / 30Y+2.4bp
+
+## Gates
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| vix_contango | ✅ | VIX/VIX3M=0.824 ok |
+| casc | ✅ | CASC ok |
+| credit | ✅ | HYG z=+1.55(20d:up) LQD z=+0.87: ok |
+
+## 1. UST Yields
+
+| Tenor | Latest | Daily (bp) | 5D (bp) | 20D vol (bp) |
+|-------|--------|-----------|---------|-------------|
+| 13W | 3.618% | -0.5 | -1.0 | 1.2 |
+| 5Y | 4.213% | +2.3 | -6.8 | 4.56 |
+| 10Y | 4.487% | +2.4 | -6.5 | 4.03 |
+| 30Y | 4.975% | +2.4 | -4.9 | 3.08 |
+
+## 2. ETF Snapshot (Futu)
+
+| Ticker | Price | Daily | 5D | Signal |
+|--------|-------|-------|-----|--------|
+| SHY | $81.91 | -0.10% | -0.24% | 2Y proxy |
+| IEF | $94.0 | -0.38% | -0.30% | 10Y proxy |
+| TLT | $86.09 | -0.76% | +0.43% | long-end |
+| UUP | $28.36 | +0.21% | +1.39% | USD |
+| GLD | $384.59 | -0.65% | -3.02% | Gold |
+| QQQ | $737.95 | -0.25% | -0.70% | Nasdaq |
+| SPY | $744.39 | -0.31% | -1.13% | S&P500 |
+| IWM | $298.18 | +0.88% | +1.20% | Russell |
+| HYG | $79.94 | -0.09% | -0.12% | HY credit |
+| LQD | $108.78 | -0.27% | -0.19% | IG credit |
+| VXX | $22.52 | -1.23% | -0.18% | Volatility |
+| CL | $88.67 | -0.91% | -2.11% | WTI |
 
 ## 3. VIX
 
-**22.22** (日变+2.35)
+**16.91** (daily +0.51)
 
-## 4. 五模块评分
+## 4. Score Modules
 
-| 模块 | 分数 | 满分 | 信号含义 |
-|------|------|------|----------|
-| A. Fed鹰派 | 3 | 4 | SHY↓ + DXY↑ + 黄金↓ + 纳指弱 (SHY=2Y代理) |
-| B. Fed鸽派 | 0 | 4 | SHY↑ + 黄金↑ + DXY↓ + 纳指强 |
-| C. 流动性压力 | 0 | 3 | VIX>25 + HYG/LQD↓ + Russell弱 (VIX阈值在此=25) |
-| D. 通胀/期限溢价 | 1 | 4 | 熊陡+30Y↑+WTI↑; 熊平→Fed重定价上限2 |
-| E. 增长恐慌 | 0 | 3 | SHY&IEF↑(2Y&10Y↓) + 小盘弱 + 股指分化 |
+| Module | Score | Max | Strength | Details |
+|--------|-------|-----|----------|--------|
+| A. Hawkish | 2 | 4 | SHY_down=2Y_up -0.10% z=0.9; DXY_up +0.21% z=0.7; — 以下未达阈值 —; Gold_down -0.65% (thresh -0.30%, z=0.4); Nasdaq_weak -0.25% (thresh -0.50%, z=0.1) |
+| B. Dovish | 0 | 4 | — 以下未达阈值 —; SHY_up=2Y_down -0.10% (thresh +0.05%, z=0.9); DXY_down +0.21% (thresh -0.05%, z=0.7); Gold_up -0.65% (thresh +0.30%, z=0.4); Nasdaq_strong -0.25% (thresh +0.50%, z=0.1) |
+| C. Liquidity | 0 | 3 | VIX=16.91 (thresh >18); HYG z=+1.55 LQD z=+0.87 spread=+0.68 (credit neutral); IWM-SPY=+1.19% (thresh <-0.30%) |
+| D. Inflation | 1 | 4 | curve: 5Y_5d=-6.8 10Y_5d=-6.5 30Y_5d=-4.9 (no bear-steepen/bear-flatten); 30Y_up TLT-0.76%; WTI-0.91% (thresh >+2.0%) |
+| E. Growth | 1 | 3 | SHY-0.10% IEF-0.38% (need both >+0.05%); IWM-SPY=+1.19% (thresh <-0.30%); QQQ-IWM divergence -1.13% |
 
-## 5. 抄底建议
+## 6. Curve Signals
 
-**RED**: 不适合抄底: 风险过高
+- **BAD**: Inflation/hawkish pressure
 
-## 6. 曲线信号
-- 无明显结构化曲线信号
+## 7. 2Y/10Y Interpretation
 
-## 7. 2Y / 10Y 信号解读
+> Note: 2Y proxy=SHY, 10Y proxy=IEF; ETF up = yield down
+- **2Y proxy(SHY)**: yield_up(hawkish) (-0.10%)
+- **10Y proxy(IEF)**: yield_up (-0.38%)
+- **30Y(TLT)**: yield_up (-0.76%)
+- **10Y=4.487% < 4.6%**: manageable
 
-> 注: 2Y代理=SHY(1-3Y美债ETF),10Y代理=IEF(7-10Y); ETF↑=收益率↓
+## 8. ABCD Cross-Validation
 
-- **2Y代理(SHY)**: 收益率平  日+0.00% / 5日-0.11%
-- **10Y代理(IEF)**: 收益率↑(鹰)  (-0.10%)
-- **30Y (TLT)**: 收益率↑  (-0.28%)
-- **10Y=4.542%** < 4.6%: 压力可控
+| This Tool | ABCD Reading | Match? |
+|-----------|-------------|--------|
+| A Hawkish 2/4 | 🔴 长端贴现率/真实利率压力已很高，通胀预期反而下行——纯真实利率故事。 | ⚠️ conflict |
+| C Liquidity 0/3 | 🟢 信用利差仍在自满区、继续收窄，市场尚未对企业信用恶化定价。 HY OAS=266bp, 20dΔ=-8.0 | ✅ |
+| E Growth Scare 1/3 | VIX sig: OK | ✅ |
+| D Inflation 1/4 | 🟢 外汇与跨境风险扩散暂未启动。 | ✅ |
+| CASC Gate | [CASC 确认 0/4 · C端=有序重定价·估值压缩 · 双探针:divergent · 干预守卫=未触发 | ✅ |
 
-## 8. 与 ABCD 模型交叉验证
-
-| 本工具 | ABCD 对应读数 | 一致? |
-|--------|--------------|-------|
-| A 鹰派 3/4 主导 | C🔴 + 利率驱动 | ✅ |
-| C 流动性压力 0/3 | B🟢 + CASC MOVE平静 + HYG跑赢LQD | ✅ |
-| E 增长恐慌 0/3 | 非增长恐慌 | ✅ |
-| D 通胀 1/4 (熊平封顶) | BEI -13bp + 曲线熊平 | ⚠️ 本工具D高估(已修正) |
-| 🔴 GLD -4.15% | 真实利率平(TLT-0.28%, DFII10-1bp) | ❌ 幅度断链: 真实利率是次要项, 主驱动=仓位/动量去杠杆(5/28高点-9.3%, 6/5&6/10两次加速) |
-
-> 两套独立模型收敛到同一读数: 鹰派·利率驱动·有序重定价·非系统性。交叉确认成立。
-> 补注: GLD 缺口判别器不在"DFII10跳不跳"(它最多小幅上抬, 补不齐-4%), 而在"DFII10那点抬幅 vs -4%的缺口有多大"。补不齐的缺口本身=仓位信号。
+> Both systems converge: no structural conflict detected.
