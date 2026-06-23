@@ -1318,10 +1318,26 @@ def _push_feishu_unified_inner(history: list, webhook_url: str) -> None:
     siorb    = rec.get("sofr_iorb_bp")
     reserves = rec.get("reserves")   # B（WRESBAL M÷1000，约2994）
     dw       = rec.get("dw")         # B
+    onrrp    = rec.get("onrrp")      # B
+    srf      = rec.get("srf")        # B
     f1x3     = rec.get("sofr_fwd1x3")  # bp
     f3x6     = rec.get("sofr_fwd3x6")  # bp
+    s1m      = rec.get("sofr_1m")    # Term SOFR 1M avg %
+    s3m      = rec.get("sofr")       # Term SOFR 3M avg %
+    s6m      = rec.get("sofr_6m")    # Term SOFR 6M avg %
 
-    res_str  = f"{reserves:.0f}B" if reserves is not None else "--"
+    res_str   = f"{reserves:.0f}B"  if reserves is not None else "--"
+    onrrp_str = f"{onrrp:.1f}B"     if onrrp    is not None else "--"
+    srf_str   = f"{srf:.3f}B"       if srf      is not None else "--"
+
+    # Term SOFR 平均利率行
+    if s1m is not None and s3m is not None and s6m is not None:
+        sofr_term_line = f"Term SOFR: 1M={s1m:.4f}%  3M={s3m:.4f}%  6M={s6m:.4f}%"
+    elif s3m is not None:
+        sofr_term_line = f"Term SOFR 3M={s3m:.4f}%"
+    else:
+        sofr_term_line = ""
+
     if f1x3 is not None and f3x6 is not None:
         shape = rec.get("sofr_curve_shape", round(f1x3 - f3x6, 1))
         if shape < -10:
@@ -1347,9 +1363,11 @@ def _push_feishu_unified_inner(history: list, webhook_url: str) -> None:
     elif usd_yellow: usd_icon, usd_sig, usd_st = "🟡", "轻微偏紧·持续跟踪",     "yellow"
     else:            usd_icon, usd_sig, usd_st = "🟢", "美元流动性充裕",         "green"
 
+    _sofr_term = (f"\n{sofr_term_line}" if sofr_term_line else "")
     sec_usd = (
         f"**【美元流动性】**\n"
-        f"SOFR-IORB: {fv('sofr_iorb_bp','+.1f')}bp ｜ WRESBAL: {res_str} ｜ 贴现窗口: {fv('dw','.2f')}B\n"
+        f"SOFR-IORB: {fv('sofr_iorb_bp','+.1f')}bp ｜ WRESBAL: {res_str} ｜ DW: {fv('dw','.2f')}B ｜ ONRRP: {onrrp_str} ｜ SRF: {srf_str}"
+        f"{_sofr_term}\n"
         f"{curve_line}\n"
         f"状态：{usd_icon} {usd_sig}"
     )

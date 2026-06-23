@@ -36,6 +36,7 @@
 
   /* kpi row */
   .kpi-row{display:grid;gap:10px;margin-bottom:4px;}
+  .kpi-row-2{grid-template-columns:repeat(2,1fr);}
   .kpi-row-4{grid-template-columns:repeat(4,1fr);}
   .kpi-row-5{grid-template-columns:repeat(5,1fr);}
   .kpi-row-3{grid-template-columns:repeat(3,1fr);}
@@ -226,8 +227,8 @@
     <div class="kpi blue" id="kpi-wresbal-card">
       <div class="kpi-label">银行准备金 WRESBAL</div>
       <div class="kpi-val" id="kpi-wresbal">—</div>
-      <div class="kpi-sub">万亿美元 · 周频</div>
-      <div class="kpi-threshold" id="kpi-wresbal-dist">距3.0T: —</div>
+      <div class="kpi-sub">十亿美元 · 周频</div>
+      <div class="kpi-threshold" id="kpi-wresbal-dist">距3,000B: —</div>
       <div class="signal neutral" id="sig-wresbal">— 计算中</div>
     </div>
     <!-- DW -->
@@ -245,6 +246,33 @@
       <div class="kpi-sub">% · DFII10 日频</div>
       <div class="kpi-threshold">↑压制科技估值 · ↓利好黄金</div>
       <div class="signal neutral" id="sig-tips">— 计算中</div>
+    </div>
+  </div>
+  <!-- ONRRP + SRF + TGA 第二行 -->
+  <div class="kpi-row kpi-row-3" style="margin-bottom:10px;">
+    <!-- ON-RRP -->
+    <div class="kpi teal" id="kpi-onrrp-card">
+      <div class="kpi-label">ON-RRP 逆回购</div>
+      <div class="kpi-val" id="kpi-onrrp">—</div>
+      <div class="kpi-sub">十亿美元 · 隔夜抵押品需求</div>
+      <div class="kpi-threshold" id="kpi-onrrp-chg">较上周: —</div>
+      <div class="signal neutral" id="sig-onrrp">— 计算中</div>
+    </div>
+    <!-- SRF -->
+    <div class="kpi green" id="kpi-srf-card">
+      <div class="kpi-label">SRF 常备回购</div>
+      <div class="kpi-val" id="kpi-srf">—</div>
+      <div class="kpi-sub">十亿美元 · 银行从美联储借入</div>
+      <div class="kpi-threshold">&gt;0 = 银行流动性压力信号</div>
+      <div class="signal neutral" id="sig-srf">— 计算中</div>
+    </div>
+    <!-- TGA -->
+    <div class="kpi amber" id="kpi-tga-card">
+      <div class="kpi-label">财政部 TGA 账户</div>
+      <div class="kpi-val" id="kpi-tga">—</div>
+      <div class="kpi-sub">十亿美元 · 财政现金余额</div>
+      <div class="kpi-threshold" id="kpi-tga-chg">较上周: —</div>
+      <div class="signal neutral" id="sig-tga">— 计算中</div>
     </div>
   </div>
 
@@ -307,7 +335,7 @@
       <span style="font-size:13px;font-weight:700;letter-spacing:0.05em;">流动性三重共振</span>
       <span style="font-size:12px;font-weight:600;" id="resonance-text">— 计算中</span>
     </div>
-    <div style="font-size:10px;color:inherit;opacity:0.7;margin-top:5px;" id="resonance-detail">① SOFR曲线Back(1x3>3x6) · ② SOFR-IORB>5bp · ③ SOFR-EFFR>5bp</div>
+    <div style="font-size:10px;color:inherit;opacity:0.7;margin-top:5px;" id="resonance-detail">① SOFR曲线Back(shape&lt;-10bp) · ② SOFR-IORB&gt;5bp · ③ SOFR-EFFR&gt;5bp</div>
   </div>
 
   <!-- ④ 利率曲线 -->
@@ -373,6 +401,39 @@
     </div>
   </div>
 
+  <!-- Section ⑤ 宏观基本面 -->
+  <div class="section-label">⑤ 宏观基本面 · 韩国出口 / 中国PMI</div>
+  <div class="kpi-row kpi-row-3" style="margin-bottom:10px;">
+    <div class="kpi teal" id="kpi-kr-export-card">
+      <div class="kpi-label">韩国出口同比</div>
+      <div class="kpi-val" id="kpi-kr-export">—</div>
+      <div class="kpi-sub">FRED XTEXVA01KRM664S · % YoY</div>
+      <div class="signal neutral" id="sig-kr-export">— 加载中</div>
+    </div>
+    <div class="kpi blue" id="kpi-cn-pmi-mfg-card">
+      <div class="kpi-label">中国制造业PMI（官方）</div>
+      <div class="kpi-val" id="kpi-cn-pmi-mfg">—</div>
+      <div class="kpi-sub">NBS 官方 PMI · pt</div>
+      <div class="signal neutral" id="sig-cn-pmi-mfg">— 加载中</div>
+    </div>
+    <div class="kpi amber" id="kpi-cn-pmi-cx-card">
+      <div class="kpi-label">财新制造业PMI</div>
+      <div class="kpi-val" id="kpi-cn-pmi-cx">—</div>
+      <div class="kpi-sub">Caixin PMI · pt</div>
+      <div class="signal neutral" id="sig-cn-pmi-cx">— 加载中</div>
+    </div>
+  </div>
+  <div class="charts-grid" style="margin-bottom:10px;">
+    <div class="chart-card">
+      <div class="card-title">韩国出口同比 · 近60日（% YoY，月频 forward-fill）</div>
+      <div class="chart-wrap-md"><canvas id="chartKrExport"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">中国PMI · 近60日（NBS官方 + 财新，月频 forward-fill）</div>
+      <div class="chart-wrap-md"><canvas id="chartCnPmi"></canvas></div>
+    </div>
+  </div>
+
   <!-- Table -->
   <div class="chart-card" style="margin-bottom:10px;">
     <div class="card-title">近期数据明细</div>
@@ -434,16 +495,55 @@ function genDates(n){
 // ── 实时数据（fetch_data.py 写入 2026-03-31）──
 // ── 实时数据（fetch_data.py 写入 2026-03-31）──
 // ── 实时数据（backfill.py 写入 2026-04-01）──
+// ── 实时数据（fetch_data.py 写入 2026-04-01）──
+// ── 实时数据（fetch_data.py 写入 2026-04-01）──
+// ── 实时数据（fetch_data.py 写入 2026-04-01）──
+// ── 实时数据（fetch_data.py 写入 2026-04-01）──
 const DATES=["2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-19", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-16", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28", "2026-03-29", "2026-03-30", "2026-03-31"];
 const HIBOR=[2.99071, 2.97262, 2.99524, 2.9125, 2.89, 2.83411, 2.80071, 2.90423, 2.86244, 2.84286, 2.85589, 2.83273, 2.90566, 2.88506, 2.85637, 2.84786, 2.83917, 2.82298, 2.82595, 2.77441, 2.74839, 2.74179, 2.7775, 2.78363, 2.75625, 2.73363, 2.70375, 2.68577, 2.68649, 2.67887, 2.67512, 2.63887, 2.58887, 2.57679, 2.6, 2.58363, 2.52887, 2.48577, 2.59202, 2.58435, 2.46589, 2.4303, 2.38917, 2.36185, 2.37226, 2.37744, 2.36464, 2.35446, 2.34, 2.3506, 2.34238, 2.32911, 2.30113, 2.3431, 2.51679, 2.53119, 2.53119, 2.53119, 2.41179, 2.35661];
 const SOFR =[3.98438, 3.97922, 3.97383, 3.96813, 3.95097, 3.94479, 3.93761, 3.93021, 3.92439, 3.92439, 3.90025, 3.89385, 3.88701, 3.88029, 3.86009, 3.8528, 3.84596, 3.84147, 3.83509, 3.81792, 3.81445, 3.81198, 3.80895, 3.80582, 3.79583, 3.79225, 3.78854, 3.78462, 3.78126, 3.78126, 3.76062, 3.75119, 3.74727, 3.74301, 3.73875, 3.73371, 3.7189, 3.71554, 3.71274, 3.70993, 3.70692, 3.69727, 3.69413, 3.69121, 3.69099, 3.69077, 3.68919, 3.6893, 3.68886, 3.68841, 3.68797, 3.68639, 3.68594, 3.68561, 3.68538, 3.68416, 3.68416, 3.68416, 3.67967, 3.67967];
 const SPREAD=[-99.37, -100.66, -97.86, -105.56, -106.1, -111.07, -113.69, -102.6, -106.19, -108.15, -104.44, -106.11, -98.13, -99.52, -100.37, -100.49, -100.68, -101.85, -100.91, -104.35, -106.61, -107.02, -103.14, -102.22, -103.96, -105.86, -108.48, -109.88, -109.48, -110.24, -108.55, -111.23, -115.84, -116.62, -113.88, -115.01, -119.0, -122.98, -112.07, -112.56, -124.1, -126.7, -130.5, -132.94, -131.87, -131.33, -132.45, -133.48, -134.89, -133.78, -134.56, -135.73, -138.48, -134.25, -116.86, -115.3, -115.3, -115.3, -126.79, -132.31];
-const SOUTH =[28.79, 91.78, -49.01, 68.15, 73.06, 12.96, 28.65, -15.15, 0.94, 22.92, 36.63, 139.3, 52.39, -16.01, -8.26, -6.35, -34.27, 43.74, 32.22, 19.07, 9.52, 133.73, 249.77, 148.59, -18.87, 0.85, 48.16, 45.67, 202.19, 0.0, 0.0, 0.0, 31.31, -40.57, -73.66, 149.97, 162.14, 60.81, -4.66, -277.35, -21.88, 372.13, -179.53, 34.48, 112.83, 184.49, -12.5, -114.81, 12.17, 261.9, -210.05, 297.28, -273.61, 223.23, 33.4, -28.83, -28.83, -28.83, -24.67, 7.03];
+const SOUTH =[28.79, 91.78, -49.01, 68.15, 73.06, 12.96, 28.65, -15.15, 0.94, 22.92, 36.63, 139.3, 52.39, -16.01, -8.26, -6.35, -34.27, 43.74, 32.22, 19.07, 9.52, 133.73, 249.77, 148.59, -18.87, 0.85, 48.16, 45.67, 202.19, null, null, null, 31.31, -40.57, -73.66, 149.97, 162.14, 60.81, -4.66, -277.35, -21.88, 372.13, -179.53, 34.48, 112.83, 184.49, -12.5, -114.81, 12.17, 261.9, -210.05, 297.28, -273.61, 223.23, 33.4, -28.83, -28.83, -28.83, -24.67, 7.03];
 const ETF3033=[5.7, 5.625, 5.555, 5.565, 5.74, 5.74, 5.77, 5.705, 5.7, 5.63, 5.565, 5.62, 5.64, 5.67, 5.605, 5.63, 5.77, 5.71, 5.605, 5.4, 5.345, 5.25, 5.28, 5.23, 5.3, 5.325, 5.38, 5.295, 5.24, 5.25, 5.105, 5.29, 5.145, 5.14, 5.0, 5.03, 4.89, 4.762, 4.72, 4.692, 4.836, 4.822, 4.946, 4.936, 4.924, 4.87, 4.998, 4.998, 5.0, 4.88, 4.77, 4.606, 4.718, 4.82, 4.656, 4.68, 4.68, 4.68, 4.59, 4.55];
 const ETF3110=[30.4353, 30.4552, 30.4155, 30.5741, 30.7328, 30.8517, 30.7922, 30.9112, 30.7724, 30.7526, 30.8716, 30.931, 31.2086, 31.0897, 31.3871, 31.5655, 32.2, 32.6759, 32.1603, 31.7241, 32.0017, 32.5172, 32.5371, 32.5172, 32.8345, 33.0922, 33.2905, 33.3103, 32.8543, 33.1716, 33.2509, 33.8655, 33.806, 33.806, 33.5285, 33.806, 33.7267, 33.6078, 33.0922, 33.2707, 33.4095, 32.9534, 33.0526, 33.4293, 33.4888, 33.1517, 33.0129, 33.1716, 33.35, 32.894, 32.7155, 31.625, 32.2, 32.48, 31.92, 32.06, 32.06, 32.06, 31.94, 31.54];
 const RATIO=[0.1873, 0.1847, 0.1826, 0.182, 0.1868, 0.1861, 0.1874, 0.1846, 0.1852, 0.1831, 0.1803, 0.1817, 0.1807, 0.1824, 0.1786, 0.1784, 0.1792, 0.1747, 0.1743, 0.1702, 0.167, 0.1615, 0.1623, 0.1608, 0.1614, 0.1609, 0.1616, 0.159, 0.1595, 0.1583, 0.1535, 0.1562, 0.1522, 0.152, 0.1491, 0.1488, 0.145, 0.1417, 0.1426, 0.141, 0.1447, 0.1463, 0.1496, 0.1477, 0.147, 0.1469, 0.1514, 0.1507, 0.1499, 0.1484, 0.1458, 0.1456, 0.1465, 0.1484, 0.1459, 0.146, 0.146, 0.146, 0.1437, 0.1443];
+const CNUS  =[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, -260.28, -260.28, -260.28, -262.29];
+const CFTC_NET=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, -36282, -36282, -36282, -36282];
+const CFTC_CHG=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, -3451, -3451, -3451, -3451];
+const WTI_M15=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 16.75, 16.75, 16.75, 21.61];
+const BWTI  =[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 12.93, 5.68, 5.68, 3.68];
+const VIX_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 31.05, 31.05, 31.05, 29.01];
+const WTI_PX=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 99.64, 99.64, 99.64, 104.36];
+const US2Y  =[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 3.96, 3.96, 3.96, 3.96];
+const US10Y =[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 4.42, 4.42, 4.42, 4.42];
+const SP2Y10Y=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 0.56, 0.56, 0.56, 0.56];
+const SP3M10Y=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 0.71, 0.71, 0.71, 0.71];
+const BEI10Y=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2.31, 2.31, 2.31, 2.31];
+const TIPS10Y=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2.08, 2.08, 2.08, 2.08];
+const CN10Y_FRED=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const CNUS_FRED=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const SOFR_IORB=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 0.0, 0.0, 0.0, -2.0];
+const SOFR_EFFR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1.0, 1.0, -1.0];
+const FWD1X3=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1.3, 1.3, 1.3];
+const FWD3X6=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 38.4, 38.4, 37.3];
+const SOFR_CURVE_SHAPE=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, -37.1, -37.1, -36.0];
+const SOFR_6M=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 3.876, 3.876, 3.866];
+const WRESBAL=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2993.955, 2993.955, 2993.955, 2993.955];
+const DW_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 3.75, 3.75, 3.75, 3.75];
+const ONRRP=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 0.992, 0.992, 0.992, 0.752];
+const SRF_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 0.0, 0.0, 0.0, 0.0];
+const TGA_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 874.077, 874.077, 874.077, 874.077];
+const KR_EXPORT_YOY=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const CN_PMI_MFG=[50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.3, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 49.0, 50.4];
+const CN_PMI_CAIXIN=[50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.1, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 50.3, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 52.1, 50.8];
+const US_JP_2Y_SPREAD=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const DXY_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const USDJPY_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const AUDJPY_ARR=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const DE_US_SPREAD=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
+const IT_DE_SPREAD=[null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null];
 
-let data={dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],etf3110:[...ETF3110],ratio:[...RATIO]};
+let data={dates:[...DATES],hibor:[...HIBOR],sofr:[...SOFR],spread:[...SPREAD],south:[...SOUTH],etf3033:[...ETF3033],etf3110:[...ETF3110],ratio:[...RATIO],cnusSpread:[...CNUS],cftcNet:[...CFTC_NET],cftcChg:[...CFTC_CHG],wtiM15:[...WTI_M15],brentWti:[...BWTI],vix:[...VIX_ARR],wtiPx:[...WTI_PX],us2y:[...US2Y],us10y:[...US10Y],sp2y10y:[...SP2Y10Y],sp3m10y:[...SP3M10Y],bei10y:[...BEI10Y],tips10y:[...TIPS10Y],tips:[...TIPS10Y],cn10yFred:[...CN10Y_FRED],cnusFred:[...CNUS_FRED],sofrIorb:[...SOFR_IORB],sofrEffrBp:[...SOFR_EFFR],fwd1x3:[...FWD1X3],fwd3x6:[...FWD3X6],sofrCurveShape:[...SOFR_CURVE_SHAPE],sofr6m:[...SOFR_6M],wresbal:[...WRESBAL],dw:[...DW_ARR],onrrp:[...ONRRP],srf:[...SRF_ARR],tga:[...TGA_ARR],usJp2ySpread:[...US_JP_2Y_SPREAD],dxy:[...DXY_ARR],usdjpy:[...USDJPY_ARR],audjpy:[...AUDJPY_ARR],deUsSpread:[...DE_US_SPREAD],itDeSpread:[...IT_DE_SPREAD],krExport:[...KR_EXPORT_YOY],cnPmiMfg:[...CN_PMI_MFG],cnPmiCaixin:[...CN_PMI_CAIXIN]};
 
 // ── 图表共用配置 ──
 const mono="'IBM Plex Mono',monospace";
@@ -461,6 +561,7 @@ const baseOpts={responsive:true,maintainAspectRatio:false,interaction:{mode:'ind
 
 let chartRates,chartSpread,chartETF,chartRatio,chartOverlay,chartLiqPressure,chartReserves;
 let chartYields,chartYieldSpreads,chartBei,chartCnUs;
+let chartKrExport,chartCnPmi;
 
 function initCharts(){
   const labels=data.dates;
@@ -669,6 +770,32 @@ function initCharts(){
       plugins:{tooltip:{...tt('#4ade80'),callbacks:{label:c=>` US−CN: ${c.parsed.y!=null?c.parsed.y.toFixed(3)+'%':'—'}`}}},
       scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(2)+'%'}}}}
   });
+
+  // 12. 韩国出口同比
+  const kred = data.krExport || [];
+  chartKrExport = new Chart(document.getElementById('chartKrExport'),{
+    type:'line', data:{labels, datasets:[
+      {label:'韩国出口 YoY (%)',data:kred,borderColor:'#2dd4bf',borderWidth:1.8,tension:0.4,
+       fill:{target:{value:0},above:'rgba(45,212,191,0.08)',below:'rgba(248,113,113,0.08)'},spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{tooltip:{...tt('#2dd4bf'),callbacks:{label:c=>` 出口YoY: ${c.parsed.y!=null?c.parsed.y.toFixed(1)+'%':'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(1)+'%'}}}}
+  });
+
+  // 13. 中国 PMI
+  const pmimfg = data.cnPmiMfg    || [];
+  const pmicx  = data.cnPmiCaixin || [];
+  chartCnPmi = new Chart(document.getElementById('chartCnPmi'),{
+    type:'line', data:{labels, datasets:[
+      {label:'NBS官方PMI',data:pmimfg,borderColor:'#60a5fa',borderWidth:1.8,tension:0.4,fill:false,spanGaps:true},
+      {label:'财新PMI',   data:pmicx, borderColor:'#fb923c',borderWidth:1.5,tension:0.4,borderDash:[5,3],fill:false,spanGaps:true}
+    ]},
+    options:{...baseOpts,
+      plugins:{legend:{display:true,labels:{color:'#9ca3af',boxWidth:20,font:{family:mono,size:10}}},
+        tooltip:{...tt('#60a5fa'),callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(1):'—'}`}}},
+      scales:{...baseScales,y:{...baseScales.y,ticks:{callback:v=>v.toFixed(1)},suggestedMin:48,suggestedMax:55}}}
+  });
 }
 
 // ── KPI更新 ──
@@ -749,23 +876,27 @@ function updateKPI(){
   const siCrv=document.getElementById('sig-sofrcrv');
   const card=document.getElementById('kpi-sofrcrv-card');
   if(crvSh!=null){
-    if(crvSh>10){
-      siCrv.className='signal bearish'; siCrv.textContent='🔴 Back结构确认';
-      card.className='kpi orange';
-    } else if(crvSh>0){
-      siCrv.className='signal warning'; siCrv.textContent='⚠️ 近端压力';
-      card.className='kpi orange';
-    } else {
-      siCrv.className='signal bullish'; siCrv.textContent='✓ Contango · 正常形态';
+    // 新公式：shape = 1x3利差 - 3x6利差；shape<0 = Back（近端低于远端，预期降息）
+    if(crvSh<-10){
+      siCrv.className='signal bullish'; siCrv.textContent='↓ Back·预期显著降息';
       card.className='kpi green';
+    } else if(crvSh<0){
+      siCrv.className='signal bullish'; siCrv.textContent='↓ Back·预期小幅降息';
+      card.className='kpi teal';
+    } else if(crvSh<10){
+      siCrv.className='signal neutral'; siCrv.textContent='→ Contango·预期平稳';
+      card.className='kpi amber';
+    } else {
+      siCrv.className='signal bearish'; siCrv.textContent='🔴 Contango·预期收紧';
+      card.className='kpi red';
     }
   } else if(f36!=null){
-    if(f36>10){
-      siCrv.className='signal bearish'; siCrv.textContent='↑ 市场预期收紧';
-      card.className='kpi red';
-    } else if(f36<-10){
+    if(f36<-10){
       siCrv.className='signal bullish'; siCrv.textContent='↓ 市场预期宽松';
       card.className='kpi green';
+    } else if(f36>10){
+      siCrv.className='signal bearish'; siCrv.textContent='↑ 市场预期收紧';
+      card.className='kpi red';
     } else {
       siCrv.className='signal neutral'; siCrv.textContent='→ 曲线平坦';
       card.className='kpi teal';
@@ -823,7 +954,7 @@ function updateKPI(){
   const sEffr  = data.sofrEffrBp     ? data.sofrEffrBp[i]     : null;
   const sIorb2 = data.sofrIorb       ? data.sofrIorb[i]       : null;
   let nTrig=0,trigNames=[];
-  if(cShape!=null&&cShape>0){nTrig++;trigNames.push('①曲线Back('+cShape.toFixed(1)+'bp)');}
+  if(cShape!=null&&cShape<-10){nTrig++;trigNames.push('①曲线Back('+cShape.toFixed(1)+'bp)');}
   if(sIorb2!=null&&sIorb2>5){nTrig++;trigNames.push('②SOFR-IORB(+'+(sIorb2.toFixed(1))+'bp)');}
   if(sEffr!=null&&sEffr>5){nTrig++;trigNames.push('③SOFR-EFFR(+'+(sEffr.toFixed(1))+'bp)');}
   const rcCard=document.getElementById('resonance-card');
@@ -888,14 +1019,75 @@ function updateKPI(){
     }
   }
 
+  // ON-RRP
+  const onrrpVal = data.onrrp ? data.onrrp[i] : null;
+  if(onrrpVal!=null){
+    document.getElementById('kpi-onrrp').textContent=onrrpVal.toFixed(2)+'B';
+    let prevOnrrp=null;
+    for(let k=i-1;k>=0;k--){if(data.onrrp[k]!=null){prevOnrrp=data.onrrp[k];break;}}
+    if(prevOnrrp!=null){
+      const chgO=onrrpVal-prevOnrrp;
+      document.getElementById('kpi-onrrp-chg').textContent='较上周: '+(chgO>=0?'+':'')+chgO.toFixed(2)+'B';
+    }
+    const onCard=document.getElementById('kpi-onrrp-card');
+    const onSig=document.getElementById('sig-onrrp');
+    if(onrrpVal<200){
+      onCard.className='kpi red'; onSig.className='signal bearish'; onSig.textContent='极低 <200B · 系统缺乏抵押品';
+    } else if(onrrpVal<500){
+      onCard.className='kpi amber'; onSig.className='signal warning'; onSig.textContent='偏低 · 货币市场压力';
+    } else if(onrrpVal<1000){
+      onCard.className='kpi teal'; onSig.className='signal neutral'; onSig.textContent='正常区间 500~1000B';
+    } else {
+      onCard.className='kpi green'; onSig.className='signal bullish'; onSig.textContent='充裕 >1000B · 流动性宽松';
+    }
+  }
+
+  // SRF
+  const srfVal = data.srf ? data.srf[i] : null;
+  if(srfVal!=null){
+    document.getElementById('kpi-srf').textContent=srfVal.toFixed(3)+'B';
+    const srfCard=document.getElementById('kpi-srf-card');
+    const srfSig=document.getElementById('sig-srf');
+    if(srfVal<=0){
+      srfCard.className='kpi green'; srfSig.className='signal bullish'; srfSig.textContent='0B · 无压力';
+    } else if(srfVal<10){
+      srfCard.className='kpi amber'; srfSig.className='signal warning'; srfSig.textContent='轻度使用 · 关注';
+    } else if(srfVal<50){
+      srfCard.className='kpi orange'; srfSig.className='signal warning'; srfSig.textContent='明显使用 · 银行流动性偏紧';
+    } else {
+      srfCard.className='kpi red blink'; srfSig.className='signal bearish'; srfSig.textContent='🔴 大量使用 · 流动性压力';
+    }
+  }
+
+  // TGA
+  const tgaVal = data.tga ? data.tga[i] : null;
+  if(tgaVal!=null){
+    document.getElementById('kpi-tga').textContent=Math.round(tgaVal).toLocaleString()+'B';
+    let prevTga=null;
+    for(let k=i-1;k>=0;k--){if(data.tga[k]!=null){prevTga=data.tga[k];break;}}
+    if(prevTga!=null){
+      const chgT=tgaVal-prevTga;
+      document.getElementById('kpi-tga-chg').textContent='较上周: '+(chgT>=0?'+':'')+Math.round(chgT)+'B';
+    }
+    const tgaCard=document.getElementById('kpi-tga-card');
+    const tgaSig=document.getElementById('sig-tga');
+    if(tgaVal>700){
+      tgaCard.className='kpi green'; tgaSig.className='signal bullish'; tgaSig.textContent='TGA 充裕 · 财政压力小';
+    } else if(tgaVal>400){
+      tgaCard.className='kpi amber'; tgaSig.className='signal warning'; tgaSig.textContent='TGA 适中 · 关注债务上限';
+    } else {
+      tgaCard.className='kpi red'; tgaSig.className='signal bearish'; tgaSig.textContent='TGA 低位 · 流动性注入压力';
+    }
+  }
+
   // 联动徽章
   const badge=document.getElementById('liq-badge');
   const badgeText=document.getElementById('liq-badge-text');
   if(wre!=null&&dw!=null){
-    if(wre>3.0&&dw<2){
-      badge.className='liq-badge green'; badgeText.textContent='流动性理想 · WRESBAL>3T & DW<2B';
-    } else if(wre<2.9||dw>5){
-      badge.className='liq-badge red blink'; badgeText.textContent='流动性危险 · WRESBAL<2.9T 或 DW>5B';
+    if(wre>3000&&dw<2){
+      badge.className='liq-badge green'; badgeText.textContent='流动性理想 · WRESBAL>3000B & DW<2B';
+    } else if(wre<2900||dw>5){
+      badge.className='liq-badge red blink'; badgeText.textContent='流动性危险 · WRESBAL<2900B 或 DW>5B';
     } else {
       badge.className='liq-badge amber'; badgeText.textContent='流动性警戒 · 接近阈值';
     }
@@ -977,6 +1169,38 @@ function updateKPI(){
     else if(cnf<1){card.className='kpi amber';sig.className='signal warning';sig.textContent='US-CN 利差收窄 0.5~1%';}
     else{card.className='kpi green';sig.className='signal bullish';sig.textContent='US 利率溢价充足 >1%';}
   }
+
+  // ── ⑤ 宏观基本面 KPI ──────────────────────────────────────────────
+  const kr  = data.krExport    ? data.krExport[i]    : null;
+  const pmm = data.cnPmiMfg    ? data.cnPmiMfg[i]    : null;
+  const pmc = data.cnPmiCaixin ? data.cnPmiCaixin[i] : null;
+
+  // 韩国出口同比
+  if(kr!=null){
+    document.getElementById('kpi-kr-export').textContent=(kr>=0?'+':'')+kr.toFixed(1)+'%';
+    const card=document.getElementById('kpi-kr-export-card'),sig=document.getElementById('sig-kr-export');
+    if(kr>10){card.className='kpi green';sig.className='signal bullish';sig.textContent='出口强劲 >10% · 全球需求旺';}
+    else if(kr>0){card.className='kpi teal';sig.className='signal bullish';sig.textContent='出口正增长 · 温和扩张';}
+    else if(kr>-10){card.className='kpi amber';sig.className='signal warning';sig.textContent='出口小幅收缩 · 需求走弱';}
+    else{card.className='kpi red';sig.className='signal bearish';sig.textContent='出口深度萎缩 <-10% · 衰退信号';}
+  }
+  // 官方PMI
+  if(pmm!=null){
+    document.getElementById('kpi-cn-pmi-mfg').textContent=pmm.toFixed(1);
+    const card=document.getElementById('kpi-cn-pmi-mfg-card'),sig=document.getElementById('sig-cn-pmi-mfg');
+    if(pmm>51){card.className='kpi green';sig.className='signal bullish';sig.textContent='制造业扩张 >51 · 景气偏强';}
+    else if(pmm>=50){card.className='kpi teal';sig.className='signal bullish';sig.textContent='荣枯线上方 50~51 · 温和扩张';}
+    else if(pmm>=49){card.className='kpi amber';sig.className='signal warning';sig.textContent='荣枯线下方 49~50 · 轻度收缩';}
+    else{card.className='kpi red';sig.className='signal bearish';sig.textContent='制造业收缩 <49 · 景气偏弱';}
+  }
+  // 财新PMI
+  if(pmc!=null){
+    document.getElementById('kpi-cn-pmi-cx').textContent=pmc.toFixed(1);
+    const card=document.getElementById('kpi-cn-pmi-cx-card'),sig=document.getElementById('sig-cn-pmi-cx');
+    if(pmc>51){card.className='kpi green';sig.className='signal bullish';sig.textContent='财新扩张 >51 · 中小企业强';}
+    else if(pmc>=50){card.className='kpi amber';sig.className='signal bullish';sig.textContent='财新荣枯线上 50~51 · 温和';}
+    else{card.className='kpi red';sig.className='signal bearish';sig.textContent='财新收缩 <50 · 中小企业疲弱';}
+  }
 }
 
 // ── 数据表 ──
@@ -1027,12 +1251,12 @@ function updateInterp(){
   // ── 美元流动性底层信号 ──
   let liqScore=0;
   if(siV!=null&&siV<5) liqScore++; else if(siV!=null&&siV>10) liqScore--;
-  if(wreV!=null&&wreV>3.0) liqScore++; else if(wreV!=null&&wreV<2.9) liqScore-=2;
+  if(wreV!=null&&wreV>3000) liqScore++; else if(wreV!=null&&wreV<2900) liqScore-=2;
   if(tipChg!=null&&tipChg<-0.1) liqScore++; else if(tipChg!=null&&tipChg>0.1) liqScore--;
   if(liqScore>=2&&sp<-10){
-    t+='<strong>【做多加权】</strong> SOFR-IORB充裕+WRESBAL>3T+TIPS下行，美元流动性底层向好，与港元宽松共振——3033 积极做多。 ';
-  } else if(liqScore<=-2||siV>10&&wreV<2.9&&tipChg>0.1){
-    t+='<strong>【做空加权】</strong> SOFR-IORB>10bp+WRESBAL<2.9T+TIPS上行，美元流动性底层恶化——减仓3033，转守3110。 ';
+    t+='<strong>【做多加权】</strong> SOFR-IORB充裕+WRESBAL>3000B+TIPS下行，美元流动性底层向好，与港元宽松共振——3033 积极做多。 ';
+  } else if(liqScore<=-2||siV>10&&wreV<2900&&tipChg>0.1){
+    t+='<strong>【做空加权】</strong> SOFR-IORB>10bp+WRESBAL<2900B+TIPS上行，美元流动性底层恶化——减仓3033，转守3110。 ';
   } else if(siV!=null){
     t+=`SOFR-IORB ${siV>=0?'+':''}${siV!=null?siV.toFixed(1):'--'}bp（准备金底层）· WRESBAL ${wreV!=null?wreV.toFixed(3)+'T':'--'} · TIPS ${tipV!=null?tipV.toFixed(3)+'%':'--'}，底层流动性尚稳。 `;
   }

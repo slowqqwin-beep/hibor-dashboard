@@ -86,6 +86,29 @@ def fred_latest_billion(series_id: str) -> tuple:
     return None, None
 
 
+def fred_history(series_id: str, observation_start: str) -> list[dict]:
+    """
+    从 observation_start 起拉取所有有效观测，升序返回。
+    每条为 {"date": "YYYY-MM-DD", "value": float}。
+    """
+    if not FRED_KEY:
+        raise EnvironmentError("FRED_API_KEY not set")
+    r = requests.get(
+        "https://api.stlouisfed.org/fred/series/observations",
+        params=dict(series_id=series_id, api_key=FRED_KEY,
+                    file_type="json", sort_order="asc",
+                    observation_start=observation_start,
+                    limit="200"),
+        timeout=20,
+    )
+    r.raise_for_status()
+    return [
+        {"date": o["date"], "value": float(o["value"])}
+        for o in r.json().get("observations", [])
+        if o["value"] != "."
+    ]
+
+
 # ════════════════════════════════════════════════════════════════════
 # ① ON RRP
 # ════════════════════════════════════════════════════════════════════
@@ -642,6 +665,98 @@ def push_feishu_liquidity(history: list, webhook_url: str) -> None:
 
 
 # ════════════════════════════════════════════════════════════════════
+# 历史回填（history < 60 条时自动执行）
+# ════════════════════════════════════════════════════════════════════
+def backfill_history() -> list:
+    """
+    当 liquidity_history.json 不足 60 条时，从 FRED 回填过去 90 天历史：
+      · SOFR / IORB / EFFR（日频）→ sofr_iorb_bp / sofr_effr_bp
+      · WRESBAL（周频，非更新日用上周值前向填充）→ reserves
+      · DPCREDIT（周频，同上前向填充）→ dw
+      · RRPONTSYD（日频）→ onrrp
+    已存在的记录只补充缺失字段，不覆盖已有数据。
+    """
+    from datetime import timedelta
+    history = load_history()
+    if len(history) >= 60:
+        return history
+
+    start_date = (date.today() - timedelta(days=90)).isoformat()
+    print(f"\n── 流动性历史回填 (从 {start_date} 起) ──────────────────")
+
+    try:
+        sofr_h  = {r["date"]: r["value"] for r in fred_history("SOFR",      start_date)}
+        iorb_h  = {r["date"]: r["value"] for r in fred_history("IORB",      start_date)}
+        effr_h  = {r["date"]: r["value"] for r in fred_history("FEDFUNDS",  start_date)}
+        onrrp_h = {r["date"]: r["value"] for r in fred_history("RRPONTSYD", start_date)}
+        wres_h  = {r["date"]: round(r["value"] / 1000, 3)
+                   for r in fred_history("WRESBAL",  start_date)}
+        dw_h    = {r["date"]: r["value"] for r in fred_history("DPCREDIT",  start_date)}
+    except Exception as e:
+        print(f"  FRED 批量拉取失败: {e}，跳过回填")
+        return history
+
+    # 以日频序列（SOFR）为时间轴基准
+    all_dates = sorted(sofr_h.keys())
+
+    def ffill(hist_dict: dict, dates: list) -> dict:
+        """对给定日期列表做 forward-fill（周频数据适用）。"""
+        out, last = {}, None
+        for d in dates:
+            if d in hist_dict:
+                last = hist_dict[d]
+            out[d] = last
+        return out
+
+    # 周频序列前向填充到每个交易日
+    wres_ff = ffill(wres_h, all_dates)
+    dw_ff   = ffill(dw_h,   all_dates)
+
+    existing = {r["date"]: i for i, r in enumerate(history)}
+    added, patched = 0, 0
+
+    for d in all_dates:
+        sofr = sofr_h.get(d)
+        if sofr is None:
+            continue
+
+        new_fields: dict = {"sofr": sofr}
+        iorb = iorb_h.get(d)
+        if iorb is not None:
+            new_fields["iorb"] = iorb
+            new_fields["sofr_iorb_bp"] = round((sofr - iorb) * 100, 1)
+        effr = effr_h.get(d)
+        if effr is not None:
+            new_fields["effr"] = effr
+            new_fields["sofr_effr_bp"] = round((sofr - effr) * 100, 1)
+        if onrrp_h.get(d) is not None:
+            new_fields["onrrp"] = onrrp_h[d]
+        if wres_ff.get(d) is not None:
+            new_fields["reserves"] = wres_ff[d]
+        if dw_ff.get(d) is not None:
+            new_fields["dw"] = dw_ff[d]
+
+        if d in existing:
+            rec = history[existing[d]]
+            for k, v in new_fields.items():
+                if k not in rec:          # 只补缺失，不覆盖
+                    rec[k] = v
+                    patched += 1
+        else:
+            history.append({"date": d, **new_fields})
+            added += 1
+
+    history.sort(key=lambda r: r["date"])
+    history = history[-MAX_HIST_DAYS:]
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    print(f"  流动性回填：新增 {added} 条 / 补字段 {patched} 处，共 {len(history)} 条")
+    return history
+
+
+# ════════════════════════════════════════════════════════════════════
 # Main
 # ════════════════════════════════════════════════════════════════════
 def main():
@@ -722,7 +837,7 @@ def main():
 
     # ── 写入 ─────────────────────────────────────────────────────────────
     print("\n── 写入 ──────────────────────────────────────────────────")
-    history = load_history()
+    history = backfill_history()           # 不足 60 条时自动回填历史序列
     history = save_history(history, record)
     update_liquidity_html(history)
 
@@ -733,7 +848,14 @@ def main():
 
     # ── 飞书推送 ──────────────────────────────────────────────────────
     print("\n── 飞书推送 ────────────────────────────────────────────────")
-    push_feishu_liquidity(history, os.environ.get("WEBHOOK_URL", ""))
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(REPO_ROOT))
+        from fetch_data import push_feishu_unified, load_history as _load_main
+        push_feishu_unified(_load_main(), os.environ.get("WEBHOOK_URL", ""))
+    except Exception as _e:
+        print(f"  统一推送加载失败，退回旧格式: {_e}")
+        push_feishu_liquidity(history, os.environ.get("WEBHOOK_URL", ""))
 
 
 if __name__ == "__main__":
