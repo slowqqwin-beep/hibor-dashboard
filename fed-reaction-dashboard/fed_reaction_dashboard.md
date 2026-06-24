@@ -1,6 +1,6 @@
 # Fed Reaction Dashboard v2
 
-**2026-06-24 09:57:28 CST** | **2026-06-24 01:57:28 UTC** | Futu + yfinance
+**2026-06-24 10:05:07 CST** | **2026-06-24 02:05:07 UTC** | Futu + yfinance
 
 ## 0. State Machine: **⏸ OBSERVE** (Day 8)
 
@@ -30,6 +30,8 @@
 | 5Y | 4.261% | +3.6 | +7.3 | 4.13 |
 | 10Y | 4.493% | +4.2 | +2.4 | 3.48 |
 | 30Y | 4.940% | +3.9 | -3.1 | 2.83 |
+| **2Y (SHY proxy)** | $81.97 | +0.07% | -0.19% | ETF price |
+> 2Y yield proxy: SHY (1-3Y Treasury ETF). CBOE ^TWO delisted, FRED DGS2 unavailable.
 
 ## 2. ETF Snapshot (Futu)
 
@@ -56,11 +58,11 @@
 
 | Module | Score | Max | Strength | Details |
 |--------|-------|-----|----------|--------|
-| A. Hawkish | 3 | 4 1strong | DXY_up +0.32% z=1.1; Gold_down -1.89% z=1.1; Nasdaq_weak -3.29% z=1.7 (强); — 以下未达阈值 —; SHY_down=2Y_up +0.07% (thresh -0.05%, z=0.6) |
-| B. Dovish | 1 | 4 | SHY_up=2Y_down +0.07% z=0.6; — 以下未达阈值 —; DXY_down +0.32% (thresh -0.05%, z=1.1); Gold_up -1.89% (thresh +0.30%, z=1.1); Nasdaq_strong -3.29% (thresh +0.50%, z=1.7) |
-| C. Liquidity | 0 | 3 | VIX=19.49>18 elevated; HYG z=+1.42 LQD z=+0.76 spread=+0.66 (credit neutral); IWM-SPY=+0.49% (thresh <-0.30%) |
-| D. Inflation | 1 | 4 | bear-flatten: 5Y_5d=+7.3 > 10Y_5d=+2.4 > 30Y_5d=-3.1 (Fed repricing); TLT+0.13% (thresh <-0.50%); WTI++3.11% (need BEI confirm) |
-| E. Growth | 2 | 3 | SHY&IEF both up: SHY+0.07% IEF+0.13% (2Y&10Y down); IWM-SPY=+0.49% (thresh <-0.30%); QQQ-IWM divergence -2.33% |
+| A. Hawkish | 3 | 4 | 1strong | DXY_up +0.32% z=1.1; Gold_down -1.89% z=1.1; Nasdaq_weak -3.29% z=1.7 (强); — 以下未达阈值 —; SHY_down=2Y_up +0.07% (thresh -0.05%, z=0.6) |
+| B. Dovish | 1 | 4 |  | SHY_up=2Y_down +0.07% z=0.6; — 以下未达阈值 —; DXY_down +0.32% (thresh -0.05%, z=1.1); Gold_up -1.89% (thresh +0.30%, z=1.1); Nasdaq_strong -3.29% (thresh +0.50%, z=1.7) |
+| C. Liquidity | 0 | 3 |  | VIX=19.49>18 elevated; HYG z=+1.42 LQD z=+0.76 spread=+0.66 (credit neutral); IWM-SPY=+0.49% (thresh <-0.30%) |
+| D. Inflation | 1 | 4 |  | bear-flatten: 5Y_5d=+7.3 > 10Y_5d=+2.4 > 30Y_5d=-3.1 (Fed repricing); TLT+0.13% (thresh <-0.50%); WTI++3.11% (need BEI confirm) |
+| E. Growth | 2 | 3 |  | SHY&IEF both up: SHY+0.07% IEF+0.13% (2Y&10Y down); IWM-SPY=+0.49% (thresh <-0.30%); QQQ-IWM divergence -2.33% |
 
 ## 6. Curve Signals
 
