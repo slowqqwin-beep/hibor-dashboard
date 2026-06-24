@@ -1,9 +1,9 @@
 {
-  "updated_at": "2026-06-23 13:05:58 CST",
-  "updated_at_utc": "2026-06-23 05:05:58 UTC",
+  "updated_at": "2026-06-24 09:32:06 CST",
+  "updated_at_utc": "2026-06-24 01:32:06 UTC",
   "state": "OBSERVE",
-  "state_days": 7,
-  "headline": "No trigger B=0 C=0 E=1",
+  "state_days": 8,
+  "headline": "No trigger B=1 C=0 E=2",
   "recommendation": "OBSERVE",
   "attribution": "混合信号",
   "vix": 16.91,
@@ -14,14 +14,14 @@
     "lqd_z": 0.871,
     "spread_z": 0.675
   },
-  "hyg_lqd": 0.7349,
+  "hyg_lqd": 0.7334,
   "ten_year": 4.487,
   "scores": {
-    "hawkish": 2,
-    "dovish": 0,
+    "hawkish": 3,
+    "dovish": 1,
     "liquidity": 0,
     "inflation": 1,
-    "growth": 1
+    "growth": 2
   },
   "gates": {
     "vix_contango": true,
@@ -29,6 +29,7 @@
     "credit": true
   },
   "upgrade_needs": [
-    "B>=3 (now 0/4)"
+    "B>=3 (now 1/4)",
+    "E<=1 (now 2/3)"
   ]
 }

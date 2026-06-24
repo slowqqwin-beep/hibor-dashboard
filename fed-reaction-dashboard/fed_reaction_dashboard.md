@@ -1,12 +1,12 @@
 # Fed Reaction Dashboard v2
 
-**2026-06-23 13:05:58 CST** | **2026-06-23 05:05:58 UTC** | Futu + yfinance
+**2026-06-24 09:32:06 CST** | **2026-06-24 01:32:06 UTC** | Futu + yfinance
 
-## 0. State Machine: **⏸ OBSERVE** (Day 7)
+## 0. State Machine: **⏸ OBSERVE** (Day 8)
 
-> No trigger B=0 C=0 E=1
+> No trigger B=1 C=0 E=2
 
-> **To upgrade**: B>=3 (now 0/4)
+> **To upgrade**: B>=3 (now 1/4) | E<=1 (now 2/3)
 
 ## Driver Attribution
 
@@ -35,18 +35,18 @@
 
 | Ticker | Price | Daily | 5D | Signal |
 |--------|-------|-------|-----|--------|
-| SHY | $81.91 | -0.10% | -0.24% | 2Y proxy |
-| IEF | $94.0 | -0.38% | -0.30% | 10Y proxy |
-| TLT | $86.09 | -0.76% | +0.43% | long-end |
-| UUP | $28.36 | +0.21% | +1.39% | USD |
-| GLD | $384.59 | -0.65% | -3.02% | Gold |
-| QQQ | $737.95 | -0.25% | -0.70% | Nasdaq |
-| SPY | $744.39 | -0.31% | -1.13% | S&P500 |
-| IWM | $298.18 | +0.88% | +1.20% | Russell |
-| HYG | $79.94 | -0.09% | -0.12% | HY credit |
-| LQD | $108.78 | -0.27% | -0.19% | IG credit |
-| VXX | $22.52 | -1.23% | -0.18% | Volatility |
-| CL | $88.67 | -0.91% | -2.11% | WTI |
+| SHY | $81.97 | +0.07% | -0.19% | 2Y proxy |
+| IEF | $94.12 | +0.13% | -0.42% | 10Y proxy |
+| TLT | $86.2 | +0.13% | +0.01% | long-end |
+| UUP | $28.45 | +0.32% | +1.86% | USD |
+| GLD | $377.32 | -1.89% | -5.11% | Gold |
+| QQQ | $713.65 | -3.29% | -2.11% | Nasdaq |
+| SPY | $733.58 | -1.45% | -1.98% | S&P500 |
+| IWM | $295.32 | -0.96% | +1.11% | Russell |
+| HYG | $79.87 | -0.09% | -0.20% | HY credit |
+| LQD | $108.91 | +0.12% | -0.19% | IG credit |
+| VXX | $23.87 | +5.99% | +5.76% | Volatility |
+| CL | $91.43 | +3.11% | +0.85% | WTI |
 
 ## 3. VIX
 
@@ -56,31 +56,31 @@
 
 | Module | Score | Max | Strength | Details |
 |--------|-------|-----|----------|--------|
-| A. Hawkish | 2 | 4 | SHY_down=2Y_up -0.10% z=0.9; DXY_up +0.21% z=0.7; — 以下未达阈值 —; Gold_down -0.65% (thresh -0.30%, z=0.4); Nasdaq_weak -0.25% (thresh -0.50%, z=0.1) |
-| B. Dovish | 0 | 4 | — 以下未达阈值 —; SHY_up=2Y_down -0.10% (thresh +0.05%, z=0.9); DXY_down +0.21% (thresh -0.05%, z=0.7); Gold_up -0.65% (thresh +0.30%, z=0.4); Nasdaq_strong -0.25% (thresh +0.50%, z=0.1) |
-| C. Liquidity | 0 | 3 | VIX=16.91 (thresh >18); HYG z=+1.55 LQD z=+0.87 spread=+0.68 (credit neutral); IWM-SPY=+1.19% (thresh <-0.30%) |
-| D. Inflation | 1 | 4 | curve: 5Y_5d=-6.8 10Y_5d=-6.5 30Y_5d=-4.9 (no bear-steepen/bear-flatten); 30Y_up TLT-0.76%; WTI-0.91% (thresh >+2.0%) |
-| E. Growth | 1 | 3 | SHY-0.10% IEF-0.38% (need both >+0.05%); IWM-SPY=+1.19% (thresh <-0.30%); QQQ-IWM divergence -1.13% |
+| A. Hawkish | 3 | 4 1strong | DXY_up +0.32% z=1.1; Gold_down -1.89% z=1.1; Nasdaq_weak -3.29% z=1.7 (强); — 以下未达阈值 —; SHY_down=2Y_up +0.07% (thresh -0.05%, z=0.6) |
+| B. Dovish | 1 | 4 | SHY_up=2Y_down +0.07% z=0.6; — 以下未达阈值 —; DXY_down +0.32% (thresh -0.05%, z=1.1); Gold_up -1.89% (thresh +0.30%, z=1.1); Nasdaq_strong -3.29% (thresh +0.50%, z=1.7) |
+| C. Liquidity | 0 | 3 | VIX=16.91 (thresh >18); HYG z=+1.55 LQD z=+0.87 spread=+0.68 (credit neutral); IWM-SPY=+0.49% (thresh <-0.30%) |
+| D. Inflation | 1 | 4 | curve: 5Y_5d=-6.8 10Y_5d=-6.5 30Y_5d=-4.9 (no bear-steepen/bear-flatten); TLT+0.13% (thresh <-0.50%); WTI++3.11% (need BEI confirm) |
+| E. Growth | 2 | 3 | SHY&IEF both up: SHY+0.07% IEF+0.13% (2Y&10Y down); IWM-SPY=+0.49% (thresh <-0.30%); QQQ-IWM divergence -2.33% |
 
 ## 6. Curve Signals
 
-- **BAD**: Inflation/hawkish pressure
+- **WARN**: Growth-scare type cut
 
 ## 7. 2Y/10Y Interpretation
 
 > Note: 2Y proxy=SHY, 10Y proxy=IEF; ETF up = yield down
-- **2Y proxy(SHY)**: yield_up(hawkish) (-0.10%)
-- **10Y proxy(IEF)**: yield_up (-0.38%)
-- **30Y(TLT)**: yield_up (-0.76%)
+- **2Y proxy(SHY)**: yield_down(dovish) (+0.07%)
+- **10Y proxy(IEF)**: yield_down (+0.13%)
+- **30Y(TLT)**: yield_down (+0.13%)
 - **10Y=4.487% < 4.6%**: manageable
 
 ## 8. ABCD Cross-Validation
 
 | This Tool | ABCD Reading | Match? |
 |-----------|-------------|--------|
-| A Hawkish 2/4 | 🔴 长端贴现率/真实利率压力已很高，通胀预期反而下行——纯真实利率故事。 | ⚠️ conflict |
+| A Hawkish 3/4 | 🔴 长端贴现率/真实利率压力已很高，通胀预期反而下行——纯真实利率故事。 | ⚠️ conflict |
 | C Liquidity 0/3 | 🟢 信用利差仍在自满区、继续收窄，市场尚未对企业信用恶化定价。 HY OAS=266bp, 20dΔ=-8.0 | ✅ |
-| E Growth Scare 1/3 | VIX sig: OK | ✅ |
+| E Growth Scare 2/3 | VIX sig: OK | ⚠️ |
 | D Inflation 1/4 | 🟢 外汇与跨境风险扩散暂未启动。 | ✅ |
 | CASC Gate | [CASC 确认 0/4 · C端=有序重定价·估值压缩 · 双探针:divergent · 干预守卫=未触发 | ✅ |
 
