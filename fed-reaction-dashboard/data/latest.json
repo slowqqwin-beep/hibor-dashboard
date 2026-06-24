@@ -1,21 +1,21 @@
 {
-  "updated_at": "2026-06-24 09:32:06 CST",
-  "updated_at_utc": "2026-06-24 01:32:06 UTC",
+  "updated_at": "2026-06-24 09:57:28 CST",
+  "updated_at_utc": "2026-06-24 01:57:28 UTC",
   "state": "OBSERVE",
   "state_days": 8,
   "headline": "No trigger B=1 C=0 E=2",
   "recommendation": "OBSERVE",
-  "attribution": "混合信号",
-  "vix": 16.91,
-  "vix3m": 20.51,
-  "vix_vix3m_ratio": 0.824,
+  "attribution": "鹰派重定价 (前端引领)",
+  "vix": 19.49,
+  "vix3m": 21.06,
+  "vix_vix3m_ratio": 0.925,
   "hyg_lqd_z": {
-    "hyg_z": 1.546,
-    "lqd_z": 0.871,
-    "spread_z": 0.675
+    "hyg_z": 1.42,
+    "lqd_z": 0.764,
+    "spread_z": 0.656
   },
   "hyg_lqd": 0.7334,
-  "ten_year": 4.487,
+  "ten_year": 4.493,
   "scores": {
     "hawkish": 3,
     "dovish": 1,
